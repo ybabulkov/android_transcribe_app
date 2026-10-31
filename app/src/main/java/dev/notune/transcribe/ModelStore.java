@@ -8,8 +8,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Which speech models the app can use: the bundled Parakeet model (absent in
@@ -20,6 +22,12 @@ import java.util.Locale;
 public final class ModelStore {
     private static final String TAG = "ModelStore";
     private static final String ACTIVE_MODEL_FILE = "active_model";
+    private static final String ACTIVE_LANGUAGE_FILE = "model_language";
+    private static final String LAST_EXPLICIT_LANGUAGE_FILE = "last_explicit_language";
+
+    /** Languages the quick switcher offers (BCP-47 tags the engine understands). */
+    public static final String LANG_BG = "bg-BG";
+    public static final String LANG_EN = "en-US";
     /** Asset directory of the bundled model (see src/assets.rs). */
     private static final String BUILTIN_ASSET_DIR = "builtin-model";
 
@@ -119,6 +127,187 @@ public final class ModelStore {
         String fallback = hasBuiltinModel(ctx) || names.isEmpty() ? "" : names.get(0);
         if (!fallback.equals(active)) setActiveModel(ctx, fallback);
         return fallback;
+    }
+
+    // --- Language -------------------------------------------------------------
+
+    /** The language hint passed to the model; "" = automatic. */
+    public static String activeLanguage(Context ctx) {
+        return activeLanguageInDir(ctx.getFilesDir());
+    }
+
+    static String activeLanguageInDir(File filesDir) {
+        return readFile(new File(filesDir, ACTIVE_LANGUAGE_FILE));
+    }
+
+    /**
+     * Stores the language hint ("" or null = automatic). An explicit language
+     * is also remembered as the one to fall back to when a model needs one.
+     */
+    public static void setActiveLanguage(Context ctx, String tag) {
+        setActiveLanguageInDir(ctx.getFilesDir(), tag);
+    }
+
+    static void setActiveLanguageInDir(File filesDir, String tag) {
+        String value = tag == null ? "" : tag.trim();
+        writeFile(new File(filesDir, ACTIVE_LANGUAGE_FILE), value);
+        if (!value.isEmpty() && !value.equalsIgnoreCase("auto")) {
+            writeFile(new File(filesDir, LAST_EXPLICIT_LANGUAGE_FILE), value);
+        }
+    }
+
+    /** The last explicitly chosen language, {@link #LANG_BG} if none yet. */
+    public static String lastExplicitLanguage(Context ctx) {
+        return lastExplicitLanguageInDir(ctx.getFilesDir());
+    }
+
+    static String lastExplicitLanguageInDir(File filesDir) {
+        String value = readFile(new File(filesDir, LAST_EXPLICIT_LANGUAGE_FILE));
+        return value.isEmpty() ? LANG_BG : value;
+    }
+
+    /** True for Canary models, which cannot run without an explicit language. */
+    public static boolean isCanaryModel(String fileName) {
+        return fileName != null && fileName.toLowerCase(Locale.ROOT).contains("canary");
+    }
+
+    /**
+     * Canary has no automatic mode: if it is the model and the language is
+     * empty/auto, applies the last explicit language. Returns the language in
+     * effect afterwards.
+     */
+    public static String ensureValidLanguageForModel(Context ctx, String modelFileName) {
+        return ensureValidLanguageInDir(ctx.getFilesDir(), modelFileName);
+    }
+
+    static String ensureValidLanguageInDir(File filesDir, String modelFileName) {
+        String lang = activeLanguageInDir(filesDir);
+        if (isCanaryModel(modelFileName) && (lang.isEmpty() || lang.equalsIgnoreCase("auto"))) {
+            lang = lastExplicitLanguageInDir(filesDir);
+            setActiveLanguageInDir(filesDir, lang);
+        }
+        return lang;
+    }
+
+    // --- Display names --------------------------------------------------------
+
+    /**
+     * A concise chip label for a model file, e.g. "canary-1b-v2-Q8_0.gguf" ->
+     * "Canary 1B v2 Q8". An empty name is the bundled model: {@code builtinFallback}.
+     */
+    public static String shortModelLabel(String fileName, String builtinFallback) {
+        if (fileName == null || fileName.isEmpty()) return builtinFallback;
+        String base = fileName;
+        if (base.toLowerCase(Locale.ROOT).endsWith(".gguf")) {
+            base = base.substring(0, base.length() - 5);
+        }
+        String[] tokens = base.replace('_', ' ').replace('-', ' ').trim().split("\\s+");
+        StringBuilder out = new StringBuilder();
+        for (String token : tokens) {
+            String lower = token.toLowerCase(Locale.ROOT);
+            if (lower.isEmpty()) continue;
+            // Quantization sub-tokens and architecture noise.
+            if (lower.equals("0") || lower.equals("k") || lower.equals("m") || lower.equals("s")
+                    || lower.equals("tdt") || lower.equals("ctc")) {
+                continue;
+            }
+            String word;
+            if (lower.matches("\\d+(\\.\\d+)?[bm]") || lower.matches("q\\d+")) {
+                word = lower.toUpperCase(Locale.ROOT);   // 1b -> 1B, q8 -> Q8
+            } else if (lower.matches("[a-z]+")) {
+                word = Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+            } else {
+                word = lower;                            // v2, v3, ...
+            }
+            if (out.length() > 0) out.append(' ');
+            out.append(word);
+        }
+        return out.length() == 0 ? fileName : out.toString();
+    }
+
+    /**
+     * Short labels for the given model keys ("" = bundled), made unique: if
+     * two models collapse to the same label, the repeats get " (2)", " (3)", ...
+     */
+    public static List<String> buildDisambiguatedLabels(List<String> modelKeys, String builtinFallback) {
+        List<String> labels = new ArrayList<>(modelKeys.size());
+        for (String key : modelKeys) labels.add(shortModelLabel(key, builtinFallback));
+
+        Map<String, Integer> total = new HashMap<>();
+        for (String label : labels) {
+            Integer n = total.get(label);
+            total.put(label, n == null ? 1 : n + 1);
+        }
+        Map<String, Integer> seen = new HashMap<>();
+        for (int i = 0; i < labels.size(); i++) {
+            String label = labels.get(i);
+            if (total.get(label) > 1) {
+                Integer n = seen.get(label);
+                int index = n == null ? 1 : n + 1;
+                seen.put(label, index);
+                labels.set(i, label + " (" + index + ")");
+            }
+        }
+        return labels;
+    }
+
+    // --- File helpers ---------------------------------------------------------
+
+    private static String readFile(File f) {
+        if (!f.exists()) return "";
+        try {
+            return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).trim();
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private static void writeFile(File f, String value) {
+        if (value == null || value.isEmpty()) {
+            f.delete();
+            return;
+        }
+        try {
+            Files.write(f.toPath(), value.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to write " + f.getName(), e);
+        }
+    }
+
+    /**
+     * True if {@code status} ends the current session phase without a result.
+     * While recording, only a microphone that never opened (or a cancel) does:
+     * a model-load error then comes from the background warm-up, and the
+     * recording goes on (the load is retried when capture stops). Once capture
+     * has stopped, model-load and transcription failures end the session too.
+     */
+    public static boolean isTerminalSessionStatus(String status, boolean recording, boolean transcribing) {
+        if (recording) return isRecordingFailureStatus(status);
+        if (transcribing) return isTranscriptionFailureStatus(status);
+        return isRecordingFailureStatus(status) || isTranscriptionFailureStatus(status);
+    }
+
+    /** Statuses meaning the microphone is not (or no longer) recording. */
+    static boolean isRecordingFailureStatus(String status) {
+        return status != null && (
+                status.equals("Canceled")
+                || status.startsWith("Error: no microphone available")
+                || status.startsWith("Error: failed to open microphone"));
+    }
+
+    /**
+     * Statuses ending a transcription without a result. A fallback notice such
+     * as "Error loading X: ... - using built-in model" is not one: the session
+     * goes on with the bundled model.
+     */
+    static boolean isTranscriptionFailureStatus(String status) {
+        return status != null && (
+                status.equals("Canceled")
+                || status.equals(NO_MODEL_STATUS)
+                || status.startsWith("Error: no audio recorded")
+                || status.startsWith("Error: model not loaded")
+                || status.startsWith("Error: Model failed to load")
+                || (status.startsWith("Error loading ") && !status.contains("using built-in model")));
     }
 
     /** An engine status for display, with the no-model error translated. */

@@ -45,11 +45,52 @@ public class RecognizeActivity extends AppCompatActivity {
     private MicLevelView micLevel;
     private final AudioFocusPauser audioPauser = new AudioFocusPauser();
     private boolean pauseAudioActive = false;
+    // True from the moment capture is stopped until the session ends (result
+    // delivered, canceled or failed); see finishRecording().
+    private boolean isTranscribing = false;
+    // A model/language switch tapped while recording or transcribing, applied
+    // when the session ends.
+    private final PendingSwitchState pendingSwitch = new PendingSwitchState();
+    private QuickSwitchBarHelper quickSwitchBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.recognize_activity);
+
+        // Before the early returns below, so the bar also works when the
+        // microphone permission or a model is missing.
+        quickSwitchBar = new QuickSwitchBarHelper(findViewById(android.R.id.content), pendingSwitch,
+                new QuickSwitchBarHelper.Host() {
+                    @Override
+                    public boolean shouldDeferSwitch() {
+                        return isRecording || isTranscribing;
+                    }
+
+                    @Override
+                    public void onSelectionApplied(boolean modelChanged, boolean langChanged) {
+                        // The application context, not this activity: it may be
+                        // finishing, and must not be kept alive (or called) by
+                        // the native side.
+                        if (modelChanged || langChanged) {
+                            try {
+                                EngineBridge.reloadEngine(getApplicationContext());
+                            } catch (Throwable t) {
+                                Log.e(TAG, "reloadEngine failed", t);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onPendingChanged() {
+                        // The queued chip shows its own marker; nothing else to update.
+                    }
+
+                    @Override
+                    public void onManageModelsClicked() {
+                        RecognizeActivity.this.onManageModelsClicked();
+                    }
+                });
 
         // Keep the screen awake for the lifetime of this recording screen so it
         // never sleeps mid-capture and cuts the recording short.
@@ -64,10 +105,12 @@ public class RecognizeActivity extends AppCompatActivity {
                 isRecording = false;
                 cancelRecording();   // new native method
             }
+            isTranscribing = false;
             if (pauseAudioActive) {
                 audioPauser.abandon(this);
                 pauseAudioActive = false;
             }
+            quickSwitchBar.flushPending();
             setResult(Activity.RESULT_CANCELED);
             finish();
         });
@@ -109,6 +152,7 @@ public class RecognizeActivity extends AppCompatActivity {
     private void finishRecording() {
         if (!isRecording) return;
         isRecording = false;
+        isTranscribing = true;
         status.setText(R.string.voice_processing);
         stopRecording();
         if (pauseAudioActive) {
@@ -132,11 +176,13 @@ public class RecognizeActivity extends AppCompatActivity {
         // is a keyboard-only feature; a popup must not record unseen.)
         if (isRecording && !isFinishing()) {
             isRecording = false;
+            isTranscribing = false;
             try { cancelRecording(); } catch (Throwable t) { /* ignore */ }
             if (pauseAudioActive) {
                 audioPauser.abandon(this);
                 pauseAudioActive = false;
             }
+            quickSwitchBar.flushPending();
             setResult(Activity.RESULT_CANCELED);
             finish();
         }
@@ -152,9 +198,33 @@ public class RecognizeActivity extends AppCompatActivity {
         try { cleanupNative(this); } catch (Throwable t) { /* ignore */ }
     }
 
+    /** The settings button: leave the popup and open the model screen. */
+    private void onManageModelsClicked() {
+        if (isRecording) {
+            isRecording = false;
+            isTranscribing = false;
+            try { cancelRecording(); } catch (Throwable t) { Log.w(TAG, "cancelRecording failed", t); }
+        }
+        isTranscribing = false;
+        if (pauseAudioActive) {
+            audioPauser.abandon(this);
+            pauseAudioActive = false;
+        }
+        quickSwitchBar.flushPending();
+        startActivity(new Intent(this, ModelsActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        setResult(Activity.RESULT_CANCELED);
+        finish();
+    }
+
     // Called from Rust
     public void onStatusUpdate(String s) {
         runOnUiThread(() -> {
+            if (ModelStore.isTerminalSessionStatus(s, isRecording, isTranscribing)) {
+                isRecording = false;
+                isTranscribing = false;
+                quickSwitchBar.flushPending();
+            }
             // Errors are shown as they are; everything else (model loading,
             // "Transcribing...") just means listening or busy for the user.
             if (s != null && s.startsWith("Error")) {
@@ -173,16 +243,19 @@ public class RecognizeActivity extends AppCompatActivity {
     // Called from Rust – keep same method name as IME for code reuse
     public void onTextTranscribed(String text) {
         runOnUiThread(() -> {
+            isTranscribing = false;
             if (text == null || text.trim().isEmpty()) {
                 // Nothing was recognized (e.g. auto-stop after silence only).
                 // Say so: otherwise the panel just vanishes as if it broke.
                 Toast.makeText(getApplicationContext(), R.string.voice_no_speech,
                         Toast.LENGTH_SHORT).show();
+                quickSwitchBar.flushPending();
                 setResult(Activity.RESULT_CANCELED);
                 finish();
                 return;
             }
 
+            quickSwitchBar.flushPending();
             deliverResult(text.trim());
         });
     }

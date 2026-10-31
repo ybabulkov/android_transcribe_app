@@ -255,6 +255,16 @@ impl EngineConfig {
                 .filter(|&n| n > 0),
         }
     }
+
+    /// True if going from `self` (what is loaded) to `other` needs the model
+    /// file loaded again. A different language alone does not: it is only a
+    /// hint passed with every run, so it can be updated on the loaded engine.
+    fn needs_full_reload(&self, other: &EngineConfig) -> bool {
+        self.active_model != other.active_model
+            || self.model_stamp != other.model_stamp
+            || self.translate != other.translate
+            || self.threads != other.threads
+    }
 }
 
 /// True if the model settings changed since the engine was loaded.
@@ -265,19 +275,38 @@ fn config_is_stale() -> bool {
     }
 }
 
-/// Drops the engine if its settings are outdated, so the next load picks up
-/// the current ones. Re-checked under the load lock, so concurrent callers
-/// don't throw away a load that already uses the new settings.
-fn reset_if_stale() {
+/// Brings the engine up to date with the settings on disk. If only the
+/// language changed, it is updated in place (no reload of the model file);
+/// otherwise the engine is dropped so the next load picks up the current
+/// settings. Re-checked under the load lock, so concurrent callers don't throw
+/// away a load that already uses the new settings.
+pub fn reset_if_stale() {
     let (lock, cvar) = &*LOAD_STATE;
     let mut state = lock.lock().unwrap();
     while *state == LoadState::Loading {
         state = cvar.wait(state).unwrap();
     }
-    if config_is_stale() {
-        log::info!("model settings changed; reloading the engine");
-        *GLOBAL_ENGINE.lock().unwrap() = None;
-        *state = LoadState::Idle;
+    // Clone and release LOADED_CONFIG before taking the engine mutex: a
+    // running transcription holds that one, and everything else that checks
+    // for stale settings needs LOADED_CONFIG.
+    let loaded_snapshot = LOADED_CONFIG.lock().unwrap().clone();
+    if let Some((dir, loaded)) = loaded_snapshot {
+        let current = EngineConfig::read(&dir);
+        if current != loaded {
+            if !loaded.needs_full_reload(&current) {
+                if let Some(eng_arc) = get_engine() {
+                    let mut guard = eng_arc.lock().unwrap_or_else(|p| p.into_inner());
+                    guard.language = current.language.clone();
+                    drop(guard);
+                    *LOADED_CONFIG.lock().unwrap() = Some((dir, current));
+                    log::info!("model language updated in-place");
+                    return;
+                }
+            }
+            log::info!("model settings changed; reloading the engine");
+            *GLOBAL_ENGINE.lock().unwrap() = None;
+            *state = LoadState::Idle;
+        }
     }
 }
 
@@ -429,6 +458,8 @@ fn notify_status(env: &mut JNIEnv, obj: &JObject, msg: &str) {
             "(Ljava/lang/String;)V",
             &[(&jmsg).into()],
         );
+        // A missing or throwing callback must not leave a pending exception.
+        let _ = env.exception_clear();
     }
 }
 
@@ -671,11 +702,20 @@ fn do_load(env: &mut JNIEnv, context: &JObject) -> Result<(), String> {
 
     notify_status(env, context, "Loading model...");
 
+    // What is actually loaded here is the bundled model, even if the settings
+    // name an imported one that failed to load: recording that keeps the
+    // difference visible, so the imported model is retried on the next reload.
+    let builtin_config = EngineConfig {
+        active_model: None,
+        model_stamp: None,
+        ..config
+    };
+
     match Engine::load(&path, language, translate, threads) {
         Ok(engine) => {
             let status = engine.ready_status;
             *GLOBAL_ENGINE.lock().unwrap() = Some(Arc::new(Mutex::new(engine)));
-            *LOADED_CONFIG.lock().unwrap() = Some((files_dir, config));
+            *LOADED_CONFIG.lock().unwrap() = Some((files_dir, builtin_config));
             notify_status(env, context, status);
             Ok(())
         }

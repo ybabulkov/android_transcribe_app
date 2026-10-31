@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Offline Voice Input</string>
+    <string name="app_name">Offline Voice Input (Mod)</string>
     <string name="welcome_title">Voice Input &amp; Subtitles</string>
     <string name="welcome_subtitle">Fully offline, private, and fast.</string>
     
@@ -45,7 +45,17 @@
     <string name="subtitle_lines_4">4 lines</string>
     <string name="subtitle_lines_all">All</string>
 
-    <string name="recognition_service_label">Offline Voice Input</string>
+    <string name="recognition_service_label">Offline Voice Input (Mod)</string>
+
+    <!-- Quick model / language switcher -->
+    <string name="quick_lang_bg" translatable="false">BG</string>
+    <string name="quick_lang_en" translatable="false">EN</string>
+    <string name="quick_lang_bg_desc">Bulgarian (bg-BG)</string>
+    <string name="quick_lang_en_desc">English (en-US)</string>
+    <string name="quick_manage_models_desc">Manage speech models</string>
+    <string name="quick_add_model">Add model…</string>
+    <string name="quick_next_prefix">Next: %1$s</string>
+    <string name="quick_builtin_short" translatable="false">Parakeet 0.6B</string>
 
     <!-- Speech model management (transcribe.cpp GGUF backend) -->
     <string name="models_title">Speech models</string>
@@ -78,6 +88,7 @@
     <string name="models_language_desc">The language passed to the model. “Automatic” lets the model decide. Whisper and other models that can be told the language follow it; Parakeet models always detect the language themselves and ignore this setting. Languages the active model doesn\'t support are ignored.</string>
     <string name="models_language_auto">Automatic</string>
     <string name="models_language_saved">Language saved</string>
+    <string name="models_language_canary_explicit">Canary models need a set language, so %1$s stays selected</string>
     <string name="models_translate">Translate to English</string>
     <string name="models_translate_desc">For models that support it (e.g. Whisper): speech in any language becomes English text, including in live subtitles. Ignored by other models.</string>
     <string name="btn_models">Manage speech models</string>

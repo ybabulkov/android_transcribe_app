@@ -144,6 +144,7 @@ public class ModelsActivity extends AppCompatActivity {
         });
 
         refreshList();
+        syncLanguageForActiveModel();
     }
 
     // --- Language selection -------------------------------------------------
@@ -162,21 +163,21 @@ public class ModelsActivity extends AppCompatActivity {
             "ar-SA", "zh-CN", "hi-IN", "ja-JP", "ko-KR", "tr-TR",
     };
 
+    /** Language tags backing {@link #languageSpinner}, in adapter order. */
+    private List<String> languageTags;
+
     private void setupLanguageSpinner() {
-        String stored = readConfig("model_language");
+        String stored = ModelStore.activeLanguage(this);
 
         List<String> tags = new ArrayList<>(Arrays.asList(LANGUAGE_TAGS));
+        languageTags = tags;
         // A value from an older version (free-text field) stays selectable.
         if (!stored.isEmpty() && !tags.contains(stored)) {
             tags.add(stored);
         }
 
         List<String> labels = new ArrayList<>(tags.size());
-        for (String tag : tags) {
-            labels.add(tag.isEmpty()
-                    ? getString(R.string.models_language_auto)
-                    : Locale.forLanguageTag(tag).getDisplayName() + " (" + tag + ")");
-        }
+        for (String tag : tags) labels.add(languageLabel(tag));
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, labels);
@@ -187,9 +188,17 @@ public class ModelsActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String tag = tags.get(position);
-                if (tag.equals(readConfig("model_language"))) return;
-                writeConfig("model_language", tag);
-                snackbar(getString(R.string.models_language_saved));
+                String previous = ModelStore.activeLanguage(ModelsActivity.this);
+                if (tag.equals(previous)) return;
+                ModelStore.setActiveLanguage(ModelsActivity.this, tag);
+                // Canary cannot run on "Automatic": swap in the last explicit language.
+                if (syncLanguageForActiveModel()) {
+                    String kept = ModelStore.activeLanguage(ModelsActivity.this);
+                    snackbar(getString(R.string.models_language_canary_explicit, languageLabel(kept)));
+                    if (kept.equals(previous)) return;
+                } else {
+                    snackbar(getString(R.string.models_language_saved));
+                }
                 setStatus(getString(R.string.models_loading));
                 reloadModelNative(ModelsActivity.this);
             }
@@ -285,7 +294,8 @@ public class ModelsActivity extends AppCompatActivity {
         for (String name : names) {
             String size = Formatter.formatShortFileSize(
                     this, new File(ModelStore.modelsDir(this), name).length());
-            addModelRow(name, size, name, name.equals(active));
+            addModelRow(ModelStore.shortModelLabel(name, getString(R.string.models_builtin)),
+                    name + " · " + size, name, name.equals(active));
         }
     }
 
@@ -311,8 +321,37 @@ public class ModelsActivity extends AppCompatActivity {
         modelList.addView(row);
     }
 
+    private String languageLabel(String tag) {
+        return tag.isEmpty()
+                ? getString(R.string.models_language_auto)
+                : Locale.forLanguageTag(tag).getDisplayName() + " (" + tag + ")";
+    }
+
+    /**
+     * Applies the Canary language safeguard to the active model and moves the
+     * language dropdown to the resulting selection if it had to change.
+     * Returns true if the language was changed.
+     */
+    private boolean syncLanguageForActiveModel() {
+        String before = ModelStore.activeLanguage(this);
+        String after = ModelStore.ensureValidLanguageForModel(this, ModelStore.activeModel(this));
+        if (after.equals(before)) return false;
+        if (languageTags != null) {
+            int index = languageTags.indexOf(after);
+            if (index < 0) {
+                languageTags.add(after);
+                ArrayAdapter<String> adapter = (ArrayAdapter<String>) languageSpinner.getAdapter();
+                adapter.add(languageLabel(after));
+                index = languageTags.size() - 1;
+            }
+            languageSpinner.setSelection(index, false);
+        }
+        return true;
+    }
+
     private void selectModel(String fileNameOrNull) {
         ModelStore.setActiveModel(this, fileNameOrNull);
+        syncLanguageForActiveModel();
         refreshList();
         setStatus(getString(R.string.models_loading));
         reloadModelNative(this);
@@ -440,9 +479,12 @@ public class ModelsActivity extends AppCompatActivity {
                 if (success) {
                     snackbar(getString(R.string.models_import_done, name));
                     String before = ModelStore.activeModel(this);
+                    String langBefore = ModelStore.activeLanguage(this);
                     refreshList();
+                    syncLanguageForActiveModel();
                     // Without a bundled model, the first import becomes active.
-                    if (!before.equals(ModelStore.activeModel(this))) {
+                    if (!before.equals(ModelStore.activeModel(this))
+                            || !langBefore.equals(ModelStore.activeLanguage(this))) {
                         setStatus(getString(R.string.models_loading));
                         reloadModelNative(this);
                     }

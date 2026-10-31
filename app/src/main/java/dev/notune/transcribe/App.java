@@ -1,6 +1,7 @@
 package dev.notune.transcribe;
 
 import android.app.Application;
+import android.util.Log;
 
 import com.google.android.material.color.DynamicColors;
 
@@ -15,5 +16,13 @@ public class App extends Application {
         super.onCreate();
         ThemePrefs.apply(this);
         DynamicColors.applyToActivitiesIfAvailable(this);
+    }
+
+    /**
+     * Status sink for engine reloads started by callers that may be gone by
+     * the time the load reports back (see {@link EngineBridge}). Called from Rust.
+     */
+    public void onStatusUpdate(String status) {
+        Log.d("App", "engine status: " + status);
     }
 }

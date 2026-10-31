@@ -15,6 +15,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
@@ -55,6 +56,46 @@ public class RustInputMethodService extends InputMethodService {
     private boolean viewIsNight = false;
     private Handler mainHandler;
     private boolean isRecording = false;
+    // True from the moment capture is stopped until the session ends (text
+    // delivered, canceled or failed). Set synchronously in finishCapture():
+    // the "Transcribing..." status only arrives later from the worker thread,
+    // and a model/language switch must not slip through that gap.
+    private boolean isTranscribing = false;
+    // A model/language switch tapped while recording or transcribing. Lives on
+    // the service (not the view) so it survives onCreateInputView rebuilds.
+    private final PendingSwitchState pendingSwitch = new PendingSwitchState();
+    private QuickSwitchBarHelper quickSwitchBar;
+    private final QuickSwitchBarHelper.Host quickSwitchHost = new QuickSwitchBarHelper.Host() {
+        @Override
+        public boolean shouldDeferSwitch() {
+            return isRecording || isTranscribing;
+        }
+
+        @Override
+        public void onSelectionApplied(boolean modelChanged, boolean langChanged) {
+            // Reload (or just update the language of) the engine; progress
+            // comes back through onStatusUpdate.
+            if (modelChanged || langChanged) {
+                try {
+                    EngineBridge.reloadEngine(RustInputMethodService.this);
+                } catch (Throwable t) {
+                    Log.e(TAG, "reloadEngine failed", t);
+                }
+            }
+            updatePendingHint();
+        }
+
+        @Override
+        public void onPendingChanged() {
+            updatePendingHint();
+        }
+
+        @Override
+        public void onManageModelsClicked() {
+            startActivity(new Intent(RustInputMethodService.this, ModelsActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        }
+    };
     private boolean pendingSwitchBack = false;
     private String lastStatus = "Initializing...";
     // Key repeat settings
@@ -136,6 +177,7 @@ public class RustInputMethodService extends InputMethodService {
             spaceButton = view.findViewById(R.id.ime_space);
             enterButton = view.findViewById(R.id.ime_enter);
             switchKeyboardButton = view.findViewById(R.id.ime_switch_keyboard);
+            quickSwitchBar = new QuickSwitchBarHelper(view, pendingSwitch, quickSwitchHost);
 
             switchKeyboardButton.setOnClickListener(v -> {
                 if (isRecording) {
@@ -286,6 +328,7 @@ public class RustInputMethodService extends InputMethodService {
      * long) transcription runs.
      */
     private void finishCapture() {
+        isTranscribing = true;
         stopRecording();
         releaseAudioFocus();
         updateRecordButtonUI(false);
@@ -353,6 +396,7 @@ public class RustInputMethodService extends InputMethodService {
         super.onWindowShown();
         boolean wasVisible = windowVisible;
         windowVisible = true;
+        if (quickSwitchBar != null) quickSwitchBar.refresh();
         if (isRecording) {
             // A background recording is still running (record-in-background
             // setting): restore the recording UI.
@@ -384,13 +428,21 @@ public class RustInputMethodService extends InputMethodService {
         if (isRecording) {
             if (isStopOnHideEnabled()) {
                 // Opt-in behavior: discard the recording when the keyboard hides.
+                // If canceling fails and the fallback stop hands the audio to
+                // transcription, that session is still running.
+                boolean stillTranscribing = false;
                 try {
                     cancelRecording();
                 } catch (Throwable t) {
                     Log.w(TAG, "cancelRecording failed, falling back to stopRecording", t);
-                    try { stopRecording(); } catch (Throwable ignored) { }
+                    try {
+                        stopRecording();
+                        stillTranscribing = true;
+                    } catch (Throwable ignored) { }
                 }
+                isTranscribing = stillTranscribing;
                 updateRecordButtonUI(false);
+                if (!stillTranscribing && quickSwitchBar != null) quickSwitchBar.flushPending();
             } else {
                 // Default: keep recording in the background. The transcription
                 // is committed on return (or held in pendingCommitText).
@@ -434,6 +486,7 @@ public class RustInputMethodService extends InputMethodService {
             // padding (otherwise the bottom key row is cut off).
             rebuilt.requestApplyInsets();
         }
+        if (quickSwitchBar != null) quickSwitchBar.refresh();
         // A field is focused and the input connection is live again — commit any
         // text that finished transcribing while nothing was focused.
         flushPendingText();
@@ -460,6 +513,31 @@ public class RustInputMethodService extends InputMethodService {
             statusView.setText(R.string.voice_processing);
             hintView.setText(R.string.ime_tap_to_record);
             if (micLevelView != null) micLevelView.setLevel(0f);
+        }
+        // Never let the generic hint overwrite the "Next: ..." one.
+        applyPendingHint();
+    }
+
+    /** Shows "Next: <Model> · <Lang>" in the hint while a switch is queued during a session. */
+    private boolean applyPendingHint() {
+        if ((isRecording || isTranscribing) && hintView != null
+                && quickSwitchBar != null && quickSwitchBar.hasPending()) {
+            hintView.setText(getString(R.string.quick_next_prefix, quickSwitchBar.getPendingSummary()));
+            return true;
+        }
+        return false;
+    }
+
+    /** Re-evaluates the hint after the queued switch changed or was applied. */
+    private void updatePendingHint() {
+        if (hintView == null || applyPendingHint()) return;
+        if (isRecording) {
+            hintView.setText(R.string.ime_tap_to_stop);
+        } else {
+            // Only the hint: updateUiState() would re-derive the status line
+            // from the last engine status and undo what the caller just set.
+            hintView.setText(ModelStore.hasAnyModel(this)
+                    ? R.string.ime_tap_to_record : R.string.ime_no_model_hint);
         }
     }
 
@@ -499,12 +577,18 @@ public class RustInputMethodService extends InputMethodService {
         mainHandler.post(() -> {
             Log.d(TAG, "Status: " + status);
             lastStatus = status;
+            if (ModelStore.isTerminalSessionStatus(status, isRecording, isTranscribing)) {
+                if (isRecording) updateRecordButtonUI(false);
+                isTranscribing = false;
+                if (quickSwitchBar != null) quickSwitchBar.flushPending();
+            }
             updateUiState();
             if (pendingSwitchBack && status.startsWith("Error")) {
                 pendingSwitchBack = false;
                 switchAwayFromVoiceKeyboard();
             }
-            if (status != null && status.startsWith("Error")) {
+            // A warm-up error mid-recording must not resume the paused media.
+            if (status != null && status.startsWith("Error") && !isRecording) {
                 releaseAudioFocus();
             }
         });
@@ -513,7 +597,7 @@ public class RustInputMethodService extends InputMethodService {
     private void updateUiState() {
         boolean isLoading = lastStatus.contains("Loading") || lastStatus.contains("Initializing");
         boolean isWaiting = lastStatus.contains("Waiting");
-        boolean isTranscribing = lastStatus.contains("Transcribing") || lastStatus.contains("Processing");
+        boolean statusTranscribing = lastStatus.contains("Transcribing") || lastStatus.contains("Processing");
         boolean isError = lastStatus.startsWith("Error");
         boolean isReady = lastStatus.equals("Ready");
         boolean noModel = !isRecording && !ModelStore.hasAnyModel(this);
@@ -522,7 +606,7 @@ public class RustInputMethodService extends InputMethodService {
         if (statusView != null && !isRecording) {
             if (isError && !lastStatus.equals(ModelStore.NO_MODEL_STATUS)) {
                 statusView.setText(lastStatus);
-            } else if (isTranscribing || isWaiting) {
+            } else if (statusTranscribing || isWaiting) {
                 statusView.setText(R.string.voice_processing);
             } else if (noModel) {
                 statusView.setText(R.string.no_model_title);
@@ -540,12 +624,12 @@ public class RustInputMethodService extends InputMethodService {
         // most errors are transient (no audio, storage was full while
         // extracting the model, mic busy), and the next attempt retries.
         if (recordContainer != null) {
-            boolean disable = isTranscribing || isWaiting;
+            boolean disable = statusTranscribing || isWaiting;
             recordContainer.setEnabled(!disable);
             recordContainer.setAlpha(disable ? 0.5f : 1.0f);
         }
 
-        if (hintView != null && !isRecording) {
+        if (hintView != null && !applyPendingHint() && !isRecording) {
             hintView.setText(noModel ? R.string.ime_no_model_hint : R.string.ime_tap_to_record);
         }
     }
@@ -553,11 +637,13 @@ public class RustInputMethodService extends InputMethodService {
     // Called from Rust
     public void onTextTranscribed(String text) {
         mainHandler.post(() -> {
+            isTranscribing = false;
             if (text == null || text.trim().isEmpty()) {
                 // Nothing recognized — don't insert a stray space.
                 updateRecordButtonUI(false);
                 if (statusView != null) statusView.setText(R.string.voice_no_speech);
                 releaseAudioFocus();
+                if (quickSwitchBar != null) quickSwitchBar.flushPending();
                 if (pendingSwitchBack) {
                     pendingSwitchBack = false;
                     switchAwayFromVoiceKeyboard();
@@ -578,6 +664,7 @@ public class RustInputMethodService extends InputMethodService {
             releaseAudioFocus();
             updateRecordButtonUI(false);
             if (statusView != null) statusView.setText(R.string.ime_tap_to_record);
+            if (quickSwitchBar != null) quickSwitchBar.flushPending();
             if (pendingSwitchBack) {
                 pendingSwitchBack = false;
                 switchAwayFromVoiceKeyboard();

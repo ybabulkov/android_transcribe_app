@@ -16,6 +16,16 @@ const LEGACY_MODEL_DIR: &str = "parakeet-tdt-0.6b-v3-int8";
 
 /// Resolves the app's `filesDir` via the given Context.
 pub fn files_dir(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<PathBuf> {
+    let result = resolve_files_dir(env, context);
+    if result.is_err() {
+        // A failed Java call leaves an exception pending, which would abort
+        // the process on the next JNI call.
+        let _ = env.exception_clear();
+    }
+    result
+}
+
+fn resolve_files_dir(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<PathBuf> {
     let files_dir_obj = env
         .call_method(context, "getFilesDir", "()Ljava/io/File;", &[])?
         .l()?;

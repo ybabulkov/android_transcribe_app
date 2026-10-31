@@ -33,18 +33,26 @@
             android:visibility="gone"/>
     </LinearLayout>
 
+    <!-- Quick model / language switcher (48dp + 8dp; the record area below is
+         correspondingly 56dp shorter, so the keyboard keeps its height) -->
+    <include
+        layout="@layout/quick_switch_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp" />
+
     <!-- Record area: pulsing mic-level glow behind a circular record button -->
     <FrameLayout
         android:id="@+id/ime_record_container"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
+        android:layout_height="144dp"
         android:clickable="true"
         android:focusable="true">
 
         <dev.notune.transcribe.MicLevelView
             android:id="@+id/ime_mic_level"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
+            android:layout_width="144dp"
+            android:layout_height="144dp"
             android:layout_gravity="center"/>
 
         <View
@@ -68,7 +76,7 @@
             android:layout_height="wrap_content"
             android:text="@string/ime_tap_to_record"
             android:layout_gravity="center_horizontal|bottom"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="2dp"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textAppearance="?attr/textAppearanceBodySmall"/>
     </FrameLayout>
