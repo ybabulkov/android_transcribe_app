@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">Aucun modèle vocal installé</string>
     <string name="no_model_main">La saisie vocale, les sous-titres en direct et la transcription de fichiers nécessitent un modèle vocal. Touchez « Ajouter un modèle vocal » pour en télécharger un dans votre navigateur et l\'importer.</string>
-    <string name="no_model_steps">1. Touchez « Télécharger le modèle recommandé ». Votre navigateur télécharge Parakeet TDT 0.6B v3 (485 Mo, 25 langues européennes).\n2. Une fois le téléchargement terminé, touchez « Importer un fichier de modèle » ci-dessous et choisissez le fichier .gguf téléchargé (généralement dans Téléchargements).\n\nL\'application elle-même reste hors ligne ; seul votre navigateur télécharge le fichier. Vous pouvez le supprimer des Téléchargements après l\'import.</string>
-    <string name="btn_download_recommended">Télécharger le modèle recommandé (485 Mo)</string>
+    <string name="no_model_steps">1. Touchez « Télécharger le modèle recommandé ». Votre navigateur télécharge Canary 1B v2 (1,1 Go, 25 langues européennes).\n2. Une fois le téléchargement terminé, touchez « Importer un fichier de modèle » ci-dessous et choisissez le fichier .gguf téléchargé (généralement dans Téléchargements).\n\nL\'application elle-même reste hors ligne ; seul votre navigateur télécharge le fichier. Vous pouvez le supprimer des Téléchargements après l\'import.</string>
+    <string name="btn_download_recommended">Télécharger le modèle recommandé (1,1 Go)</string>
     <string name="btn_add_model">Ajouter un modèle vocal</string>
     <string name="models_desc_no_builtin">Importez n\'importe quel modèle GGUF transcribe.cpp téléchargé. L\'application reste entièrement hors ligne ; les téléchargements passent par votre navigateur.</string>
     <string name="model_desc_recommended">Recommandé · 25 langues européennes, rapide et précis</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Autorisation du micro requise.\nAccordez-la dans l\'application.</string>
     <string name="ime_tap_to_record">Touchez pour enregistrer</string>
     <string name="ime_tap_to_stop">Touchez pour arrêter</string>
+    <string name="ime_recording_discarded">Enregistrement supprimé</string>
     <string name="ime_listening">Écoute…</string>
     <string name="ime_need_mic">Pas d\'autorisation du micro</string>
     <string name="ime_need_mic_hint">Ouvrez l\'application pour l\'accorder</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Veuillez autoriser « Afficher par-dessus les autres applis »</string>
     <string name="subs_overlay_required">Les sous-titres en direct nécessitent l\'autorisation « Afficher par-dessus les autres applis »</string>
     <string name="subs_capture_denied">La capture d\'écran a été refusée</string>
+
+    <string name="history_button_desc">Historique des transcriptions</string>
+    <string name="history_retry">Réessayer le dernier enregistrement</string>
+    <string name="history_clear">Effacer</string>
+    <string name="history_clear_confirm">Retouchez pour effacer</string>
+    <string name="history_close_desc">Fermer l’historique</string>
+    <string name="history_empty">Aucune transcription pour le moment</string>
+    <string name="history_no_field">Touchez d’abord un champ de texte</string>
 </resources>

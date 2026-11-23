@@ -68,6 +68,11 @@ public class RecognizeActivity extends AppCompatActivity {
                     }
 
                     @Override
+                    public boolean discardRecordingForSwitch() {
+                        return discardAndRestart();
+                    }
+
+                    @Override
                     public void onSelectionApplied(boolean modelChanged, boolean langChanged) {
                         // The application context, not this activity: it may be
                         // finishing, and must not be kept alive (or called) by
@@ -79,6 +84,11 @@ public class RecognizeActivity extends AppCompatActivity {
                                 Log.e(TAG, "reloadEngine failed", t);
                             }
                         }
+                    }
+
+                    @Override
+                    public void onSwitchTapped() {
+                        // discardAndRestart() already listens again.
                     }
 
                     @Override
@@ -146,6 +156,31 @@ public class RecognizeActivity extends AppCompatActivity {
             pauseAudioActive = true;
         }
         startRecording(isAutoStopEnabled());
+    }
+
+    /**
+     * A chip was tapped while listening: drop the audio and listen again, so
+     * the next take uses the newly picked model/language. The restart is
+     * posted so it runs after the chip bar applied the switch. Media stays
+     * paused across the restart.
+     */
+    private boolean discardAndRestart() {
+        if (!isRecording) return false;
+        isRecording = false;
+        isTranscribing = false;
+        try {
+            cancelRecording();
+        } catch (Throwable t) {
+            Log.w(TAG, "cancelRecording failed", t);
+            return false;
+        }
+        status.post(() -> {
+            if (isFinishing() || isRecording || isTranscribing) return;
+            isRecording = true;
+            status.setText(R.string.voice_listening);
+            startRecording(isAutoStopEnabled());
+        });
+        return true;
     }
 
     /** Stop capture and transcribe — used by both tap-to-stop and auto-stop. */

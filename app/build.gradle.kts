@@ -25,7 +25,7 @@ android {
         }
     }
 
-    // "standard" (GitHub releases, Google Play) ships the Parakeet model;
+    // "standard" (GitHub releases, Google Play) ships the Canary model;
     // "fdroid" is the same app without it: F-Droid builds everything from
     // source, so users import a model they downloaded in their browser.
     flavorDimensions += "distribution"
@@ -217,14 +217,22 @@ data class ModelFile(val name: String, val sha256: String)
 // The bundled GGUF goes into the model_assets asset pack so the base module
 // stays under the Play Store 200 MB compressed-download limit.
 val modelPackFiles = listOf(
-    ModelFile("parakeet-tdt-0.6b-v3-Q4_K_M.gguf",
-        "b68557be1e3c40207fd7c4bd9d63f1d3316b963f15325bfb0cc16a8bb0ffd181"),
+    // Keep in sync with ModelStore.BUILTIN_MODEL_FILE.
+    ModelFile("canary-1b-v2-Q8_0.gguf",
+        "224f83d1bc487b3303b495a7d6874912fdece93de19d1a04b550829c30a5d289"),
 )
 
-val huggingFaceRepo = "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf/resolve/main"
+val huggingFaceRepo = "https://huggingface.co/handy-computer/canary-1b-v2-gguf/resolve/main"
 
 fun downloadToDir(assetsDir: File, files: List<ModelFile>) {
     assetsDir.mkdirs()
+    // The app loads the single GGUF in the pack: drop any previous default.
+    val wanted = files.map { it.name }.toSet()
+    assetsDir.listFiles { f -> f.name.endsWith(".gguf", ignoreCase = true) && f.name !in wanted }
+        ?.forEach { stale ->
+            println("  ✗ removing old bundled model ${stale.name}")
+            stale.delete()
+        }
     files.forEach { model ->
         val destFile = File(assetsDir, model.name)
         if (destFile.exists() && model.sha256.isNotEmpty()) {

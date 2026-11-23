@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">Kein Sprachmodell installiert</string>
     <string name="no_model_main">Spracheingabe, Live-Untertitel und Dateitranskription brauchen ein Sprachmodell. Tippe auf „Sprachmodell hinzufügen“, um eines im Browser herunterzuladen und zu importieren.</string>
-    <string name="no_model_steps">1. Tippe auf „Empfohlenes Modell herunterladen“. Dein Browser lädt Parakeet TDT 0.6B v3 herunter (485 MB, 25 europäische Sprachen).\n2. Wenn der Download fertig ist, tippe unten auf „Modelldatei importieren“ und wähle die heruntergeladene .gguf-Datei aus (meist unter Downloads).\n\nDie App selbst bleibt offline; nur dein Browser lädt die Datei herunter. Nach dem Import kannst du sie aus den Downloads löschen.</string>
-    <string name="btn_download_recommended">Empfohlenes Modell herunterladen (485 MB)</string>
+    <string name="no_model_steps">1. Tippe auf „Empfohlenes Modell herunterladen“. Dein Browser lädt Canary 1B v2 herunter (1,1 GB, 25 europäische Sprachen).\n2. Wenn der Download fertig ist, tippe unten auf „Modelldatei importieren“ und wähle die heruntergeladene .gguf-Datei aus (meist unter Downloads).\n\nDie App selbst bleibt offline; nur dein Browser lädt die Datei herunter. Nach dem Import kannst du sie aus den Downloads löschen.</string>
+    <string name="btn_download_recommended">Empfohlenes Modell herunterladen (1,1 GB)</string>
     <string name="btn_add_model">Sprachmodell hinzufügen</string>
     <string name="models_desc_no_builtin">Importiere ein beliebiges heruntergeladenes transcribe.cpp-GGUF-Modell. Die App bleibt vollständig offline; Downloads laufen über deinen Browser.</string>
     <string name="model_desc_recommended">Empfohlen · 25 europäische Sprachen, schnell und genau</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Mikrofonberechtigung erforderlich.\nErteile sie in der App.</string>
     <string name="ime_tap_to_record">Zum Aufnehmen tippen</string>
     <string name="ime_tap_to_stop">Zum Beenden tippen</string>
+    <string name="ime_recording_discarded">Aufnahme verworfen</string>
     <string name="ime_listening">Ich höre zu…</string>
     <string name="ime_need_mic">Keine Mikrofonberechtigung</string>
     <string name="ime_need_mic_hint">Öffne die App, um sie zu erteilen</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Bitte erlaube „Über anderen Apps einblenden“</string>
     <string name="subs_overlay_required">Live-Untertitel benötigen die Berechtigung „Über anderen Apps einblenden“</string>
     <string name="subs_capture_denied">Bildschirmaufnahme wurde abgelehnt</string>
+
+    <string name="history_button_desc">Transkriptverlauf</string>
+    <string name="history_retry">Letzte Aufnahme wiederholen</string>
+    <string name="history_clear">Löschen</string>
+    <string name="history_clear_confirm">Zum Löschen erneut tippen</string>
+    <string name="history_close_desc">Verlauf schließen</string>
+    <string name="history_empty">Noch keine Transkripte</string>
+    <string name="history_no_field">Tippe zuerst auf ein Textfeld</string>
 </resources>

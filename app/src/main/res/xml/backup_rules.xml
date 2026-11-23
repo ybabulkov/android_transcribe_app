@@ -1,0 +1,5 @@
+<full-backup-content>
+    <exclude domain="file" path="last_recording.wav" />
+    <exclude domain="file" path="last_recording.wav.tmp" />
+    <exclude domain="file" path="transcript_history.txt" />
+</full-backup-content>

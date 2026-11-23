@@ -167,11 +167,26 @@ public class ModelStoreTest {
     }
 
     @Test
+    public void builtinModel_isCanaryAndNeedsLanguage() {
+        assertTrue(ModelStore.needsExplicitLanguage(""));
+        assertTrue(ModelStore.needsExplicitLanguage(null));
+        assertTrue(ModelStore.needsExplicitLanguage(CANARY));
+        assertFalse(ModelStore.needsExplicitLanguage(PARAKEET));
+        assertEquals("bg-BG", ModelStore.ensureValidLanguageInDir(dir, ""));
+    }
+
+    @Test
+    public void pending_builtinWithAutoLanguageQueuesLastExplicit() {
+        PendingSwitchState p = new PendingSwitchState();
+        p.queueModel("", PARAKEET, "", "en-US");
+        assertEquals("", p.getPendingModel());
+        assertEquals("en-US", p.getPendingLanguage());
+    }
+
+    @Test
     public void nonCanary_languageIsLeftAlone() {
         assertEquals("", ModelStore.ensureValidLanguageInDir(dir, PARAKEET));
         assertEquals("", ModelStore.activeLanguageInDir(dir));
-        assertEquals("", ModelStore.ensureValidLanguageInDir(dir, ""));
-        assertEquals("", ModelStore.ensureValidLanguageInDir(dir, null));
     }
 
     // --- isTerminalSessionStatus -----------------------------------------
@@ -201,6 +216,15 @@ public class ModelStoreTest {
         assertTrue(ModelStore.isTerminalSessionStatus("Error: model not loaded", false, true));
         assertTrue(ModelStore.isTerminalSessionStatus(
                 "Error: no audio recorded. Check microphone permissions.", false, true));
+    }
+
+    @Test
+    public void terminal_anyErrorEndsTranscription() {
+        String unexpected = "Error: transcription failed unexpectedly, please try again";
+        assertTrue(ModelStore.isTerminalSessionStatus(unexpected, false, true));
+        assertTrue(ModelStore.isTerminalSessionStatus("Error: no saved recording", false, true));
+        assertTrue(ModelStore.isTerminalSessionStatus("Error: CPU lacks dotprod", false, true));
+        assertFalse(ModelStore.isTerminalSessionStatus(unexpected, true, false));
     }
 
     @Test

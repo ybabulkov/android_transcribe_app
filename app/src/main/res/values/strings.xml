@@ -55,14 +55,14 @@
     <string name="quick_manage_models_desc">Manage speech models</string>
     <string name="quick_add_model">Add model…</string>
     <string name="quick_next_prefix">Next: %1$s</string>
-    <string name="quick_builtin_short" translatable="false">Parakeet 0.6B</string>
+    <string name="quick_builtin_short" translatable="false">Canary 1B v2</string>
 
     <!-- Speech model management (transcribe.cpp GGUF backend) -->
     <string name="models_title">Speech models</string>
     <string name="models_section">Speech model</string>
     <string name="models_active_section">Active model</string>
     <string name="models_desc">The built-in model works out of the box. You can also import any transcribe.cpp GGUF model you\'ve downloaded. The app stays fully offline; downloads happen in your browser.</string>
-    <string name="models_builtin">Parakeet TDT 0.6B v3</string>
+    <string name="models_builtin">Canary 1B v2</string>
     <string name="models_builtin_sub">Included in the app · 25 European languages</string>
     <string name="models_loading">Loading model…</string>
     <string name="models_import">Import model file (.gguf)</string>
@@ -98,8 +98,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">No speech model installed</string>
     <string name="no_model_main">Voice input, live subtitles and file transcription need a speech model. Tap “Add a speech model” to download one in your browser and import it.</string>
-    <string name="no_model_steps">1. Tap “Download recommended model”. Your browser downloads Parakeet TDT 0.6B v3 (485 MB, 25 European languages).\n2. When the download has finished, tap “Import model file” below and pick the downloaded .gguf file (usually in Downloads).\n\nThe app itself stays offline; only your browser downloads the file. You can delete it from Downloads after importing.</string>
-    <string name="btn_download_recommended">Download recommended model (485 MB)</string>
+    <string name="no_model_steps">1. Tap “Download recommended model”. Your browser downloads Canary 1B v2 (1.1 GB, 25 European languages).\n2. When the download has finished, tap “Import model file” below and pick the downloaded .gguf file (usually in Downloads).\n\nThe app itself stays offline; only your browser downloads the file. You can delete it from Downloads after importing.</string>
+    <string name="btn_download_recommended">Download recommended model (1.1 GB)</string>
     <string name="btn_add_model">Add a speech model</string>
     <string name="models_desc_no_builtin">Import any transcribe.cpp GGUF model you\'ve downloaded. The app stays fully offline; downloads happen in your browser.</string>
     <string name="model_desc_recommended">Recommended · 25 European languages, fast and accurate</string>
@@ -143,6 +143,7 @@
     <string name="voice_need_mic">Microphone permission required.\nGrant it in the main app.</string>
     <string name="ime_tap_to_record">Tap to record</string>
     <string name="ime_tap_to_stop">Tap to stop</string>
+    <string name="ime_recording_discarded">Recording discarded</string>
     <string name="ime_listening">Listening…</string>
     <string name="ime_need_mic">No microphone permission</string>
     <string name="ime_need_mic_hint">Open the app to grant it</string>
@@ -169,4 +170,12 @@
     <string name="subs_grant_overlay">Please allow “Display over other apps”</string>
     <string name="subs_overlay_required">Live subtitles need the “Display over other apps” permission</string>
     <string name="subs_capture_denied">Screen capture was denied</string>
+
+    <string name="history_button_desc">Transcript history</string>
+    <string name="history_retry">Retry last recording</string>
+    <string name="history_clear">Clear</string>
+    <string name="history_clear_confirm">Tap again to clear</string>
+    <string name="history_close_desc">Close history</string>
+    <string name="history_empty">No transcripts yet</string>
+    <string name="history_no_field">Tap a text field first</string>
 </resources>

@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">Речевая модель не установлена</string>
     <string name="no_model_main">Для голосового ввода, субтитров в реальном времени и расшифровки файлов нужна речевая модель. Нажмите «Добавить речевую модель», чтобы скачать её в браузере и импортировать.</string>
-    <string name="no_model_steps">1. Нажмите «Скачать рекомендуемую модель». Браузер скачает Parakeet TDT 0.6B v3 (485 МБ, 25 европейских языков).\n2. Когда загрузка завершится, нажмите «Импортировать файл модели» ниже и выберите скачанный файл .gguf (обычно в папке «Загрузки»).\n\nСамо приложение остаётся офлайн: файл скачивает только браузер. После импорта его можно удалить из загрузок.</string>
-    <string name="btn_download_recommended">Скачать рекомендуемую модель (485 МБ)</string>
+    <string name="no_model_steps">1. Нажмите «Скачать рекомендуемую модель». Браузер скачает Canary 1B v2 (1,1 ГБ, 25 европейских языков).\n2. Когда загрузка завершится, нажмите «Импортировать файл модели» ниже и выберите скачанный файл .gguf (обычно в папке «Загрузки»).\n\nСамо приложение остаётся офлайн: файл скачивает только браузер. После импорта его можно удалить из загрузок.</string>
+    <string name="btn_download_recommended">Скачать рекомендуемую модель (1,1 ГБ)</string>
     <string name="btn_add_model">Добавить речевую модель</string>
     <string name="models_desc_no_builtin">Импортируйте любую скачанную модель GGUF для transcribe.cpp. Приложение остаётся полностью офлайн; загрузки выполняются в браузере.</string>
     <string name="model_desc_recommended">Рекомендуется · 25 европейских языков, быстрая и точная</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Нужно разрешение на микрофон.\nВыдайте его в приложении.</string>
     <string name="ime_tap_to_record">Нажмите для записи</string>
     <string name="ime_tap_to_stop">Нажмите, чтобы остановить</string>
+    <string name="ime_recording_discarded">Запись отменена</string>
     <string name="ime_listening">Слушаю…</string>
     <string name="ime_need_mic">Нет разрешения на микрофон</string>
     <string name="ime_need_mic_hint">Откройте приложение, чтобы выдать его</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Разрешите «Поверх других приложений»</string>
     <string name="subs_overlay_required">Для живых субтитров нужно разрешение «Поверх других приложений»</string>
     <string name="subs_capture_denied">Запись экрана запрещена</string>
+
+    <string name="history_button_desc">История расшифровок</string>
+    <string name="history_retry">Повторить последнюю запись</string>
+    <string name="history_clear">Очистить</string>
+    <string name="history_clear_confirm">Нажмите ещё раз для очистки</string>
+    <string name="history_close_desc">Закрыть историю</string>
+    <string name="history_empty">Расшифровок пока нет</string>
+    <string name="history_no_field">Сначала нажмите на текстовое поле</string>
 </resources>

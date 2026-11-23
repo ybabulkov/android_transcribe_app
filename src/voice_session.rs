@@ -1,13 +1,16 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use jni::objects::{GlobalRef, JObject};
-use jni::JNIEnv;
+use jni::{JNIEnv, JavaVM};
 
 use crate::endpoint::Endpointer;
 use crate::engine;
+use crate::last_recording;
 
 // --- Optional auto-stop endpointing ------------------------------------------
 /// Trailing silence after speech that triggers auto-stop.
@@ -30,7 +33,7 @@ pub struct VoiceSessionState {
     pub session_active: Arc<AtomicBool>,
 }
 
-fn notify_status(env: &mut JNIEnv, obj: &JObject, msg: &str) {
+pub(crate) fn notify_status(env: &mut JNIEnv, obj: &JObject, msg: &str) {
     if let Ok(jmsg) = env.new_string(msg) {
         let _ = env.call_method(
             obj,
@@ -45,15 +48,15 @@ fn notify_level(env: &mut JNIEnv, obj: &JObject, level: f32) {
     let _ = env.call_method(obj, "onAudioLevel", "(F)V", &[level.into()]);
 }
 
-fn notify_text(env: &mut JNIEnv, obj: &JObject, text: &str) {
-    if let Ok(jtxt) = env.new_string(text) {
-        let _ = env.call_method(
-            obj,
-            "onTextTranscribed",
-            "(Ljava/lang/String;)V",
-            &[(&jtxt).into()],
-        );
-    }
+fn notify_text(env: &mut JNIEnv, obj: &JObject, text: &str) -> jni::errors::Result<()> {
+    let jtxt = env.new_string(text)?;
+    env.call_method(
+        obj,
+        "onTextTranscribed",
+        "(Ljava/lang/String;)V",
+        &[(&jtxt).into()],
+    )?;
+    Ok(())
 }
 
 pub fn init_session(env: JNIEnv, target: JObject) -> VoiceSessionState {
@@ -221,12 +224,12 @@ pub fn start_recording(mut env: JNIEnv, state: &mut VoiceSessionState, auto_stop
     }
 }
 
-pub fn stop_recording(mut env: JNIEnv, state: &mut VoiceSessionState) {
+pub fn stop_recording(mut env: JNIEnv, state: &mut VoiceSessionState, save_to: Option<PathBuf>) {
     // Drop the stream to stop recording; end the auto-stop monitor if running.
     state.session_active.store(false, Ordering::SeqCst);
     state.stream = None;
 
-    let buffer = state.audio_buffer.lock().unwrap().clone();
+    let buffer = std::mem::take(&mut *state.audio_buffer.lock().unwrap());
 
     // Guard against empty buffer (mic permission denied, instant stop, etc.)
     if buffer.is_empty() {
@@ -238,40 +241,125 @@ pub fn stop_recording(mut env: JNIEnv, state: &mut VoiceSessionState) {
         return;
     }
 
-    let jvm = state.jvm.clone();
-    let target_ref = state.target_ref.clone();
+    start_transcription(&mut env, state, AudioSource::Buffer(buffer, save_to));
+}
 
-    notify_status(&mut env, target_ref.as_obj(), "Transcribing...");
+pub fn transcribe_saved(mut env: JNIEnv, state: &mut VoiceSessionState, path: PathBuf) {
+    start_transcription(&mut env, state, AudioSource::Saved(path));
+}
 
-    std::thread::spawn(move || {
-        let mut env = match jvm.attach_current_thread() {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-        let obj = target_ref.as_obj();
+enum AudioSource {
+    Buffer(Vec<f32>, Option<PathBuf>),
+    Saved(PathBuf),
+}
 
-        // Wait for the engine if it is still loading, or reload it if the
-        // model settings changed since it was loaded.
-        if !engine::is_current() {
-            if let Err(_) = engine::ensure_loaded(&mut env, obj) {
-                return;
-            }
-        }
+static RUNNING: AtomicUsize = AtomicUsize::new(0);
+/// Recordings shorter than this (0.5 s at 16 kHz) are not saved for retry.
+const MIN_SAVED_SAMPLES: usize = 8_000;
+const WORKER_ERROR: &str = "Error: transcription failed unexpectedly, please try again";
 
-        if let Some(eng_arc) = engine::get_engine() {
-            let res = engine::transcribe_speech(&eng_arc, buffer);
+struct RunningTranscription;
 
-            match res {
-                Ok(text) => {
-                    notify_status(&mut env, obj, "Ready");
-                    notify_text(&mut env, obj, &text);
+impl Drop for RunningTranscription {
+    fn drop(&mut self) {
+        RUNNING.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+pub fn transcription_running() -> bool {
+    RUNNING.load(Ordering::SeqCst) != 0
+}
+
+fn start_transcription(env: &mut JNIEnv, state: &VoiceSessionState, source: AudioSource) {
+    let obj = state.target_ref.as_obj();
+    notify_status(env, obj, "Transcribing...");
+    if let Err(e) = spawn_transcription(state.jvm.clone(), state.target_ref.clone(), source) {
+        log::error!("Could not start transcription worker: {e}");
+        notify_status(env, obj, WORKER_ERROR);
+    }
+}
+
+fn spawn_transcription(
+    jvm: Arc<JavaVM>,
+    target_ref: GlobalRef,
+    source: AudioSource,
+) -> std::io::Result<()> {
+    RUNNING.fetch_add(1, Ordering::SeqCst);
+    // Moving the guard into the closure also drops it if thread creation fails.
+    let running = RunningTranscription;
+    std::thread::Builder::new()
+        .spawn(move || {
+            let _running = running;
+            let obj = target_ref.as_obj();
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                let buffer = match source {
+                    AudioSource::Buffer(buffer, save_to) => {
+                        // Keep only takes worth retrying, so an accidental
+                        // tap or pure silence doesn't replace the recording
+                        // the user may still want to retry.
+                        let worth_keeping = buffer.len() >= MIN_SAVED_SAMPLES
+                            && !crate::endpoint::speech_range(&buffer).is_empty();
+                        if let (Some(path), true) = (save_to, worth_keeping) {
+                            if let Err(e) = last_recording::save(&path, &buffer) {
+                                log::warn!("Could not save last recording: {e}");
+                            }
+                        }
+                        Some(buffer)
+                    }
+                    AudioSource::Saved(path) => {
+                        let samples = last_recording::load(&path);
+                        if samples.is_none() && path.exists() {
+                            // Unreadable: remove it so Retry stops offering it.
+                            let _ = std::fs::remove_file(&path);
+                        }
+                        samples
+                    }
+                };
+
+                let mut env = match jvm.attach_current_thread() {
+                    Ok(env) => env,
+                    Err(e) => {
+                        log::error!("Could not attach transcription worker to JNI: {e}");
+                        return;
+                    }
+                };
+                let Some(buffer) = buffer else {
+                    notify_status(&mut env, obj, "Error: no saved recording");
+                    return;
+                };
+
+                // ensure_loaded_from_thread reports model-load failures itself.
+                if !engine::is_current()
+                    && engine::ensure_loaded_from_thread(&jvm, &target_ref).is_err()
+                {
+                    return;
                 }
-                Err(e) => notify_status(&mut env, obj, &format!("Error: {}", e)),
+
+                let Some(engine) = engine::get_engine() else {
+                    notify_status(&mut env, obj, "Error: model not loaded");
+                    return;
+                };
+                match engine::transcribe_speech(&engine, buffer) {
+                    Ok(text) => {
+                        notify_status(&mut env, obj, "Ready");
+                        if let Err(e) = notify_text(&mut env, obj, &text) {
+                            log::error!("Could not deliver transcription: {e}");
+                            let _ = env.exception_clear();
+                            notify_status(&mut env, obj, WORKER_ERROR);
+                        }
+                    }
+                    Err(e) => notify_status(&mut env, obj, &format!("Error: {e}")),
+                }
+            }));
+            if result.is_err() {
+                log::error!("Transcription worker panicked");
+                if let Ok(mut env) = jvm.attach_current_thread() {
+                    let _ = env.exception_clear();
+                    notify_status(&mut env, obj, WORKER_ERROR);
+                }
             }
-        } else {
-            notify_status(&mut env, obj, "Error: model not loaded");
-        }
-    });
+        })
+        .map(|_| ())
 }
 
 pub fn cancel_recording(mut env: JNIEnv, state: &mut VoiceSessionState) {

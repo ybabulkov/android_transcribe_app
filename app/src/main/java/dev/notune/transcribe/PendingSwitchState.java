@@ -52,7 +52,7 @@ public final class PendingSwitchState {
         // An auto-queued language must not count as "the language is set", or
         // re-tapping Canary would drop it again.
         String effectiveLang = languageExplicitlyQueued ? effectiveLanguage(activeLang) : activeLang;
-        boolean needsLanguage = ModelStore.isCanaryModel(effectiveModel) && isAutoLanguage(effectiveLang);
+        boolean needsLanguage = ModelStore.needsExplicitLanguage(effectiveModel) && isAutoLanguage(effectiveLang);
 
         if (needsLanguage) {
             if (pendingLanguage == null) {

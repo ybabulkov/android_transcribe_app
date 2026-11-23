@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">Nenhum modelo de voz instalado</string>
     <string name="no_model_main">A entrada de voz, as legendas ao vivo e a transcrição de arquivos precisam de um modelo de voz. Toque em «Adicionar um modelo de voz» para baixar um no navegador e importá-lo.</string>
-    <string name="no_model_steps">1. Toque em «Baixar modelo recomendado». Seu navegador baixa o Parakeet TDT 0.6B v3 (485 MB, 25 idiomas europeus).\n2. Quando o download terminar, toque em «Importar arquivo de modelo» abaixo e escolha o arquivo .gguf baixado (geralmente em Downloads).\n\nO app em si permanece offline; só o navegador baixa o arquivo. Depois de importar, você pode apagá-lo dos Downloads.</string>
-    <string name="btn_download_recommended">Baixar modelo recomendado (485 MB)</string>
+    <string name="no_model_steps">1. Toque em «Baixar modelo recomendado». Seu navegador baixa o Canary 1B v2 (1,1 GB, 25 idiomas europeus).\n2. Quando o download terminar, toque em «Importar arquivo de modelo» abaixo e escolha o arquivo .gguf baixado (geralmente em Downloads).\n\nO app em si permanece offline; só o navegador baixa o arquivo. Depois de importar, você pode apagá-lo dos Downloads.</string>
+    <string name="btn_download_recommended">Baixar modelo recomendado (1,1 GB)</string>
     <string name="btn_add_model">Adicionar um modelo de voz</string>
     <string name="models_desc_no_builtin">Importe qualquer modelo GGUF do transcribe.cpp que você tenha baixado. O app permanece totalmente offline; os downloads acontecem no seu navegador.</string>
     <string name="model_desc_recommended">Recomendado · 25 idiomas europeus, rápido e preciso</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Permissão de microfone necessária.\nConceda-a no app.</string>
     <string name="ime_tap_to_record">Toque para gravar</string>
     <string name="ime_tap_to_stop">Toque para parar</string>
+    <string name="ime_recording_discarded">Gravação descartada</string>
     <string name="ime_listening">Ouvindo…</string>
     <string name="ime_need_mic">Sem permissão de microfone</string>
     <string name="ime_need_mic_hint">Abra o app para concedê-la</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Permita “Sobrepor a outros apps”</string>
     <string name="subs_overlay_required">As legendas ao vivo precisam da permissão “Sobrepor a outros apps”</string>
     <string name="subs_capture_denied">A captura de tela foi negada</string>
+
+    <string name="history_button_desc">Histórico de transcrições</string>
+    <string name="history_retry">Tentar a última gravação de novo</string>
+    <string name="history_clear">Limpar</string>
+    <string name="history_clear_confirm">Toque de novo para limpar</string>
+    <string name="history_close_desc">Fechar o histórico</string>
+    <string name="history_empty">Ainda sem transcrições</string>
+    <string name="history_no_field">Toque primeiro num campo de texto</string>
 </resources>

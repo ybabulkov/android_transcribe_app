@@ -23,6 +23,11 @@ const ACTIVE_MODEL_FILE: &str = "active_model";
 /// File in filesDir with an optional language hint — a locale like `en-US`
 /// or `auto`. Absent or empty = let the model autodetect.
 const MODEL_LANGUAGE_FILE: &str = "model_language";
+/// File in filesDir with the last explicitly chosen language (written by
+/// `ModelStore.setActiveLanguage`); used for models that need a language.
+const LAST_EXPLICIT_LANGUAGE_FILE: &str = "last_explicit_language";
+/// Language for such models when none was ever chosen (`ModelStore.LANG_BG`).
+const DEFAULT_EXPLICIT_LANGUAGE: &str = "bg-BG";
 /// Marker file in filesDir: when present, models that support translation
 /// (e.g. Whisper) translate speech to English instead of transcribing it.
 /// Ignored by models without translation support.
@@ -70,18 +75,46 @@ pub struct Engine {
     /// Status reported once loading succeeded; carries a warning when the
     /// translate setting can't do what the user expects with this model.
     ready_status: &'static str,
+    /// True for models without an automatic language mode (Canary): an
+    /// empty/auto hint is replaced with the last explicit language.
+    needs_language: bool,
+}
+
+/// True for models that cannot run without a language hint (Canary). Mirrors
+/// `ModelStore.isCanaryModel`.
+fn model_needs_language(model_path: &Path) -> bool {
+    model_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.to_ascii_lowercase().contains("canary"))
+}
+
+/// The language to run with: `language`, or for a model that needs one and
+/// got none, the last explicitly chosen language (Bulgarian by default).
+fn effective_language(needs_language: bool, language: Option<String>, files_dir: &Path) -> Option<String> {
+    if language.is_some() || !needs_language {
+        return language;
+    }
+    Some(
+        read_config(&files_dir.join(LAST_EXPLICIT_LANGUAGE_FILE))
+            .filter(|l| !l.eq_ignore_ascii_case("auto"))
+            .unwrap_or_else(|| DEFAULT_EXPLICIT_LANGUAGE.to_string()),
+    )
 }
 
 impl Engine {
     fn load(
         model_path: &Path,
         language: Option<String>,
+        files_dir: &Path,
         translate: bool,
         threads: i32,
     ) -> Result<Engine, String> {
         if !model_path.is_file() {
             return Err(format!("model file not found: {}", model_path.display()));
         }
+        let needs_language = model_needs_language(model_path);
+        let language = effective_language(needs_language, language, files_dir);
         let model = transcribe_cpp::Model::load(model_path).map_err(|e| e.to_string())?;
         // Translation is gated on the model's capabilities: models without it
         // (e.g. Parakeet) silently keep transcribing, so the setting can stay
@@ -147,6 +180,7 @@ impl Engine {
             task,
             run_ext,
             ready_status,
+            needs_language,
         })
     }
 
@@ -296,7 +330,8 @@ pub fn reset_if_stale() {
             if !loaded.needs_full_reload(&current) {
                 if let Some(eng_arc) = get_engine() {
                     let mut guard = eng_arc.lock().unwrap_or_else(|p| p.into_inner());
-                    guard.language = current.language.clone();
+                    guard.language =
+                        effective_language(guard.needs_language, current.language.clone(), &dir);
                     drop(guard);
                     *LOADED_CONFIG.lock().unwrap() = Some((dir, current));
                     log::info!("model language updated in-place");
@@ -329,6 +364,21 @@ enum LoadState {
     Done,
     /// Loading failed
     Failed(String),
+}
+
+struct LoadGuard {
+    armed: bool,
+}
+
+impl Drop for LoadGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let (lock, cvar) = &*LOAD_STATE;
+            let mut state = lock.lock().unwrap_or_else(|poison| poison.into_inner());
+            *state = LoadState::Failed("load panicked".to_string());
+            cvar.notify_all();
+        }
+    }
 }
 
 pub fn get_engine() -> Option<Arc<Mutex<Engine>>> {
@@ -537,11 +587,15 @@ pub fn ensure_loaded_from_thread(
             // We take ownership of loading (retry on previous failure)
             *state = LoadState::Loading;
             drop(state);
+            let mut load_guard = LoadGuard { armed: true };
 
             let result = if let Ok(mut env) = jvm.attach_current_thread() {
                 do_load(&mut env, target_ref.as_obj())
             } else {
-                Err("Failed to attach JNI thread".to_string())
+                let msg = "Failed to attach JNI thread";
+                log::error!("{msg}");
+                notify(&format!("Error: {msg}"));
+                Err(msg.to_string())
             };
 
             let mut state = lock.lock().unwrap();
@@ -549,6 +603,7 @@ pub fn ensure_loaded_from_thread(
                 Ok(()) => *state = LoadState::Done,
                 Err(msg) => *state = LoadState::Failed(msg.clone()),
             }
+            load_guard.armed = false;
             cvar.notify_all();
             result
         }
@@ -662,7 +717,7 @@ fn do_load(env: &mut JNIEnv, context: &JObject) -> Result<(), String> {
     if let Some(name) = config.active_model.clone() {
         let path = files_dir.join("models").join(&name);
         notify_status(env, context, &format!("Loading model {}...", name));
-        match Engine::load(&path, language.clone(), translate, threads) {
+        match Engine::load(&path, language.clone(), &files_dir, translate, threads) {
             Ok(engine) => {
                 let status = engine.ready_status;
                 *GLOBAL_ENGINE.lock().unwrap() = Some(Arc::new(Mutex::new(engine)));
@@ -711,7 +766,7 @@ fn do_load(env: &mut JNIEnv, context: &JObject) -> Result<(), String> {
         ..config
     };
 
-    match Engine::load(&path, language, translate, threads) {
+    match Engine::load(&path, language, &files_dir, translate, threads) {
         Ok(engine) => {
             let status = engine.ready_status;
             *GLOBAL_ENGINE.lock().unwrap() = Some(Arc::new(Mutex::new(engine)));

@@ -1,0 +1,12 @@
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="last_recording.wav" />
+        <exclude domain="file" path="last_recording.wav.tmp" />
+        <exclude domain="file" path="transcript_history.txt" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="last_recording.wav" />
+        <exclude domain="file" path="last_recording.wav.tmp" />
+        <exclude domain="file" path="transcript_history.txt" />
+    </device-transfer>
+</data-extraction-rules>

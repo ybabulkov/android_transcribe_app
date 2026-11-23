@@ -13,7 +13,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.util.Log;
+import android.util.TypedValue;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -21,7 +24,9 @@ import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
 import android.content.res.ColorStateList;
 import android.view.ContextThemeWrapper;
+import android.view.Gravity;
 import java.io.File;
+import java.io.IOException;
 
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.color.MaterialColors;
@@ -51,6 +56,22 @@ public class RustInputMethodService extends InputMethodService {
     private View inputView;
     private MicLevelView micLevelView;
     private View recordCircle;
+    private TranscriptHistory history;
+    private View mainArea;
+    private View historyButton;
+    private View historyPanel;
+    private LinearLayout historyList;
+    private TextView historyRetry;
+    private TextView historyClear;
+    private View historyEmpty;
+    private boolean historyOpen;
+    private boolean clearArmed;
+    private final Runnable checkHistoryWorker = () -> {
+        if (historyOpen) {
+            recoverIfWorkerGone();
+            updateHistoryActions();
+        }
+    };
     // Night flag the current input view was inflated with, so it can be rebuilt
     // if the theme preference changes while this process stays alive.
     private boolean viewIsNight = false;
@@ -72,6 +93,11 @@ public class RustInputMethodService extends InputMethodService {
         }
 
         @Override
+        public boolean discardRecordingForSwitch() {
+            return discardCapture();
+        }
+
+        @Override
         public void onSelectionApplied(boolean modelChanged, boolean langChanged) {
             // Reload (or just update the language of) the engine; progress
             // comes back through onStatusUpdate.
@@ -83,6 +109,23 @@ public class RustInputMethodService extends InputMethodService {
                 }
             }
             updatePendingHint();
+        }
+
+        @Override
+        public void onSwitchTapped() {
+            // Like opening the keyboard: with auto-record on, a chip switch
+            // starts listening in the new language. Posted so it runs after
+            // the "Canceled" status of a just-discarded recording, which would
+            // otherwise mark the new recording as stopped.
+            if (!isAutoRecordEnabled()) return;
+            mainHandler.post(() -> {
+                if (windowVisible
+                        && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                                == PackageManager.PERMISSION_GRANTED
+                        && ModelStore.hasAnyModel(RustInputMethodService.this)) {
+                    startListening();
+                }
+            });
         }
 
         @Override
@@ -128,6 +171,7 @@ public class RustInputMethodService extends InputMethodService {
     public void onCreate() {
         super.onCreate();
         mainHandler = new Handler(Looper.getMainLooper());
+        history = new TranscriptHistory(new File(getFilesDir(), TranscriptHistory.FILE_NAME));
         Log.d(TAG, "Service onCreate");
         try {
             initNative(this);
@@ -157,8 +201,9 @@ public class RustInputMethodService extends InputMethodService {
             // window from a layout pass that ran before these insets arrived and
             // keep that size, cutting off the bottom row; lay out again once the
             // padding changes so the window grows to fit it.
+            int basePaddingBottom = view.getPaddingBottom();
             view.setOnApplyWindowInsetsListener((v, insets) -> {
-                int paddingBottom = v.getPaddingTop() + insets.getSystemWindowInsetBottom();
+                int paddingBottom = basePaddingBottom + insets.getSystemWindowInsetBottom();
                 if (v.getPaddingBottom() != paddingBottom) {
                     v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(), paddingBottom);
                     v.post(v::requestLayout);
@@ -178,14 +223,34 @@ public class RustInputMethodService extends InputMethodService {
             enterButton = view.findViewById(R.id.ime_enter);
             switchKeyboardButton = view.findViewById(R.id.ime_switch_keyboard);
             quickSwitchBar = new QuickSwitchBarHelper(view, pendingSwitch, quickSwitchHost);
+            mainArea = view.findViewById(R.id.ime_main_area);
+            historyButton = view.findViewById(R.id.ime_history_button);
+            historyPanel = view.findViewById(R.id.ime_history_panel);
+            historyList = view.findViewById(R.id.history_list);
+            historyRetry = view.findViewById(R.id.history_retry);
+            historyClear = view.findViewById(R.id.history_clear);
+            historyEmpty = view.findViewById(R.id.history_empty);
+            historyButton.setOnClickListener(v -> setHistoryOpen(!historyOpen));
+            view.findViewById(R.id.history_close).setOnClickListener(v -> setHistoryOpen(false));
+            historyRetry.setOnClickListener(v -> retryFromHistory());
+            historyClear.setOnClickListener(v -> clearHistory());
+            setHistoryOpen(false);
+            historyButton.setEnabled(!isRecording);
 
+            // Tap: leave right away; a running recording is thrown away, not
+            // transcribed. Long press: transcribe it first, then leave.
             switchKeyboardButton.setOnClickListener(v -> {
+                discardCapture();
+                switchAwayFromVoiceKeyboard();
+            });
+            switchKeyboardButton.setOnLongClickListener(v -> {
                 if (isRecording) {
                     pendingSwitchBack = true;
                     finishCapture();
                 } else {
                     switchAwayFromVoiceKeyboard();
                 }
+                return true;
             });
 
             // Key repeat runnable for backspace
@@ -269,7 +334,14 @@ public class RustInputMethodService extends InputMethodService {
             });
 
             recordContainer.setOnClickListener(v -> {
-                if (!recordContainer.isEnabled()) return;
+                // Stuck on "Processing" with no worker left: reset, and offer
+                // Retry instead of recording. Never start a recording in this
+                // same tap, or a new take would replace the stuck one's audio.
+                if (recoverIfWorkerGone()) {
+                    if (hasSavedRecording()) setHistoryOpen(true);
+                    return;
+                }
+                if (isTranscribing || (!isRecording && lastStatus.contains("Waiting"))) return;
 
                 // Check microphone permission
                 if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
@@ -287,12 +359,7 @@ public class RustInputMethodService extends InputMethodService {
                 if (isRecording) {
                     finishCapture();
                 } else {
-                    if (isPauseAudioEnabled()) {
-                        audioPauser.request(this);
-                        pauseAudioActive = true;
-                    }
-                    startRecording();
-                    updateRecordButtonUI(true);
+                    startListening();
                 }
             });
 
@@ -332,6 +399,43 @@ public class RustInputMethodService extends InputMethodService {
         stopRecording();
         releaseAudioFocus();
         updateRecordButtonUI(false);
+    }
+
+    /**
+     * Stops a running recording without transcribing it. Returns false if
+     * nothing was recording (e.g. the audio is already being transcribed,
+     * which can't be aborted).
+     */
+    private boolean discardCapture() {
+        if (!isRecording) return false;
+        try {
+            cancelRecording();
+        } catch (Throwable t) {
+            Log.w(TAG, "cancelRecording failed", t);
+            return false;
+        }
+        isTranscribing = false;
+        releaseAudioFocus();
+        updateRecordButtonUI(false);
+        if (statusView != null) statusView.setText(R.string.ime_recording_discarded);
+        return true;
+    }
+
+    /** Starts a recording (pausing media if that setting is on). */
+    private void startListening() {
+        if (isRecording || isTranscribing) return;
+        setHistoryOpen(false);
+        if (isPauseAudioEnabled()) {
+            audioPauser.request(this);
+            pauseAudioActive = true;
+        }
+        startRecording();
+        updateRecordButtonUI(true);
+    }
+
+    /** Auto-starts listening when the keyboard opens (and after a chip switch). */
+    private boolean isAutoRecordEnabled() {
+        return new File(getFilesDir(), "auto_record").exists();
     }
 
     private void releaseAudioFocus() {
@@ -408,21 +512,16 @@ public class RustInputMethodService extends InputMethodService {
             // text area); never auto-start a recording from here.
             return;
         }
-        if (new File(getFilesDir(), "auto_record").exists()) {
-            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED) {
-                if (isPauseAudioEnabled()) {
-                    audioPauser.request(this);
-                    pauseAudioActive = true;
-                }
-                startRecording();
-                updateRecordButtonUI(true);
-            }
+        if (isAutoRecordEnabled()
+                && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+            startListening();
         }
     }
 
     @Override
     public void onWindowHidden() {
+        setHistoryOpen(false);
         super.onWindowHidden();
         windowVisible = false;
         if (isRecording) {
@@ -473,7 +572,7 @@ public class RustInputMethodService extends InputMethodService {
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        inputActive = true;
+        inputActive = isTextEditor(info);
         // Rebuild the keyboard if the theme preference changed while this
         // (long-lived) keyboard service stayed alive, so it matches the app
         // setting.
@@ -489,7 +588,7 @@ public class RustInputMethodService extends InputMethodService {
         if (quickSwitchBar != null) quickSwitchBar.refresh();
         // A field is focused and the input connection is live again — commit any
         // text that finished transcribing while nothing was focused.
-        flushPendingText();
+        if (inputActive) flushPendingText();
     }
 
     @Override
@@ -500,6 +599,8 @@ public class RustInputMethodService extends InputMethodService {
 
     private void updateRecordButtonUI(boolean recording) {
         isRecording = recording;
+        if (recording) setHistoryOpen(false);
+        if (historyButton != null) historyButton.setEnabled(!recording);
         // Keep the screen awake while recording so it never sleeps mid-capture
         // and cuts the recording short. Cleared automatically once we stop.
         if (inputView != null) {
@@ -516,6 +617,168 @@ public class RustInputMethodService extends InputMethodService {
         }
         // Never let the generic hint overwrite the "Next: ..." one.
         applyPendingHint();
+        if (historyOpen) updateHistoryActions();
+    }
+
+    private void setHistoryOpen(boolean open) {
+        if (historyPanel == null || (open && isRecording)) return;
+        historyOpen = open;
+        mainArea.setVisibility(open ? View.GONE : View.VISIBLE);
+        historyPanel.setVisibility(open ? View.VISIBLE : View.GONE);
+        clearArmed = false;
+        historyClear.setText(R.string.history_clear);
+        mainHandler.removeCallbacks(checkHistoryWorker);
+        if (open) refreshHistoryPanel();
+    }
+
+    /**
+     * Resets a "Processing" state whose transcription worker is gone (it died
+     * without a final callback). Returns true if it reset. The worker posts
+     * all its callbacks before it stops counting as running, so by the time
+     * this sees "not running" they are already queued ahead of any later tap.
+     */
+    private boolean recoverIfWorkerGone() {
+        if (!isTranscribing || isRecording) return false;
+        try {
+            if (isTranscriptionRunning()) return false;
+        } catch (Throwable t) {
+            // If the native check is unavailable, keep the current session state.
+            return false;
+        }
+        Log.w(TAG, "Resetting processing state with no transcription worker");
+        isTranscribing = false;
+        pendingSwitchBack = false;
+        lastStatus = "Ready";
+        releaseAudioFocus();
+        if (quickSwitchBar != null) quickSwitchBar.flushPending();
+        updateUiState();
+        return true;
+    }
+
+    /** A saved recording that can be retried (more than a bare 44-byte WAV header). */
+    private boolean hasSavedRecording() {
+        File f = lastRecordingFile();
+        return f.isFile() && f.length() > 44;
+    }
+
+    private void refreshHistoryPanel() {
+        recoverIfWorkerGone();
+        historyList.removeAllViews();
+        long now = System.currentTimeMillis();
+        for (TranscriptHistory.Entry entry : history.load()) {
+            addHistoryRow(entry, now);
+        }
+        historyEmpty.setVisibility(historyList.getChildCount() == 0 ? View.VISIBLE : View.GONE);
+        updateHistoryActions();
+    }
+
+    private void updateHistoryActions() {
+        boolean busy = isRecording || isTranscribing;
+        boolean hasRecording = hasSavedRecording();
+        boolean canRetry = !busy && hasRecording;
+        historyRetry.setEnabled(canRetry);
+        historyRetry.setAlpha(canRetry ? 1f : 0.4f);
+        boolean canClear = !busy && (hasRecording || historyList.getChildCount() > 0);
+        historyClear.setEnabled(canClear);
+        historyClear.setAlpha(canClear ? 1f : 0.4f);
+        mainHandler.removeCallbacks(checkHistoryWorker);
+        if (historyOpen && isTranscribing) {
+            // JNI attachment can fail before it can send a terminal callback.
+            mainHandler.postDelayed(checkHistoryWorker, 500);
+        }
+    }
+
+    private void addHistoryRow(TranscriptHistory.Entry entry, long now) {
+        Context context = historyList.getContext();
+        float density = context.getResources().getDisplayMetrics().density;
+        int horizontalPadding = Math.round(8 * density);
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setMinimumHeight(Math.round(48 * density));
+        row.setPaddingRelative(horizontalPadding, 0, horizontalPadding, 0);
+        row.setFocusable(true);
+        row.setContentDescription(entry.text);
+        TypedValue background = new TypedValue();
+        if (context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground,
+                background, true)) {
+            row.setBackgroundResource(background.resourceId);
+        }
+        row.setOnClickListener(v -> insertFromHistory(entry.text));
+
+        TextView transcript = new TextView(context);
+        transcript.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+        transcript.setTextColor(MaterialColors.getColor(row, com.google.android.material.R.attr.colorOnSurface));
+        transcript.setSingleLine();
+        transcript.setEllipsize(TextUtils.TruncateAt.END);
+        transcript.setText(entry.text);
+        row.addView(transcript, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView time = new TextView(context);
+        time.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall);
+        time.setTextColor(MaterialColors.getColor(row, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        time.setPaddingRelative(horizontalPadding, 0, 0, 0);
+        time.setText(DateUtils.getRelativeTimeSpanString(entry.timeMillis, now, DateUtils.MINUTE_IN_MILLIS));
+        row.addView(time);
+        historyList.addView(row);
+    }
+
+    private void insertFromHistory(String text) {
+        InputConnection ic = getCurrentInputConnection();
+        if (!inputActive || ic == null) {
+            statusView.setText(R.string.history_no_field);
+            return;
+        }
+        commitTranscribedText(ic, text + " ");
+        setHistoryOpen(false);
+    }
+
+    private File lastRecordingFile() {
+        return new File(getFilesDir(), TranscriptHistory.LAST_RECORDING_FILE);
+    }
+
+    private void retryFromHistory() {
+        recoverIfWorkerGone();
+        if (isRecording || isTranscribing || !hasSavedRecording()) {
+            updateHistoryActions();
+            return;
+        }
+        setHistoryOpen(false);
+        isTranscribing = true;
+        lastStatus = "Transcribing...";
+        updateRecordButtonUI(false);
+        updateUiState();
+        try {
+            retryLastRecording();
+        } catch (Throwable t) {
+            Log.e(TAG, "retryLastRecording failed", t);
+            isTranscribing = false;
+            lastStatus = "Ready";
+            updateUiState();
+        }
+    }
+
+    private void clearHistory() {
+        if (isRecording || isTranscribing) return;
+        if (!clearArmed) {
+            clearArmed = true;
+            historyClear.setText(R.string.history_clear_confirm);
+            return;
+        }
+        history.clear();
+        File recording = lastRecordingFile();
+        if (recording.exists() && !recording.delete()) {
+            Log.w(TAG, "Could not delete last recording");
+        }
+        File partial = new File(getFilesDir(), TranscriptHistory.LAST_RECORDING_FILE + ".tmp");
+        if (partial.exists() && !partial.delete()) {
+            Log.w(TAG, "Could not delete partial recording");
+        }
+        clearArmed = false;
+        historyClear.setText(R.string.history_clear);
+        refreshHistoryPanel();
     }
 
     /** Shows "Next: <Model> · <Lang>" in the hint while a switch is queued during a session. */
@@ -560,6 +823,7 @@ public class RustInputMethodService extends InputMethodService {
 
     @Override
     public void onDestroy() {
+        setHistoryOpen(false);
         super.onDestroy();
         cleanupNative(this);
         releaseAudioFocus();
@@ -570,36 +834,39 @@ public class RustInputMethodService extends InputMethodService {
     private native void cleanupNative(RustInputMethodService self);
     private native void startRecording();
     private native void stopRecording();
+    private native void retryLastRecording();
+    private native boolean isTranscriptionRunning();
     private native void cancelRecording();
 
     // Called from Rust
     public void onStatusUpdate(String status) {
         mainHandler.post(() -> {
+            if (status == null) return;
             Log.d(TAG, "Status: " + status);
             lastStatus = status;
             if (ModelStore.isTerminalSessionStatus(status, isRecording, isTranscribing)) {
                 if (isRecording) updateRecordButtonUI(false);
                 isTranscribing = false;
                 if (quickSwitchBar != null) quickSwitchBar.flushPending();
+                if (pendingSwitchBack && status.startsWith("Error")) {
+                    pendingSwitchBack = false;
+                    switchAwayFromVoiceKeyboard();
+                }
             }
             updateUiState();
-            if (pendingSwitchBack && status.startsWith("Error")) {
-                pendingSwitchBack = false;
-                switchAwayFromVoiceKeyboard();
-            }
+            if (historyOpen) updateHistoryActions();
             // A warm-up error mid-recording must not resume the paused media.
-            if (status != null && status.startsWith("Error") && !isRecording) {
+            if (status.startsWith("Error") && !isRecording) {
                 releaseAudioFocus();
             }
         });
     }
 
     private void updateUiState() {
-        boolean isLoading = lastStatus.contains("Loading") || lastStatus.contains("Initializing");
         boolean isWaiting = lastStatus.contains("Waiting");
-        boolean statusTranscribing = lastStatus.contains("Transcribing") || lastStatus.contains("Processing");
+        boolean statusTranscribing = isTranscribing || lastStatus.contains("Transcribing")
+                || lastStatus.contains("Processing");
         boolean isError = lastStatus.startsWith("Error");
-        boolean isReady = lastStatus.equals("Ready");
         boolean noModel = !isRecording && !ModelStore.hasAnyModel(this);
 
         // Don't show internal loading states to the user
@@ -610,6 +877,8 @@ public class RustInputMethodService extends InputMethodService {
                 statusView.setText(R.string.voice_processing);
             } else if (noModel) {
                 statusView.setText(R.string.no_model_title);
+            } else if (lastStatus.equals("Canceled")) {
+                statusView.setText(R.string.ime_recording_discarded);
             } else {
                 statusView.setText(R.string.ime_tap_to_record);
             }
@@ -620,13 +889,10 @@ public class RustInputMethodService extends InputMethodService {
             progressBar.setVisibility(View.GONE);
         }
 
-        // Disable the button only while busy. After an error it stays usable:
-        // most errors are transient (no audio, storage was full while
-        // extracting the model, mic busy), and the next attempt retries.
+        // Keep taps available so a dead worker can be detected from Processing.
         if (recordContainer != null) {
-            boolean disable = statusTranscribing || isWaiting;
-            recordContainer.setEnabled(!disable);
-            recordContainer.setAlpha(disable ? 0.5f : 1.0f);
+            boolean busy = !isRecording && (statusTranscribing || isWaiting);
+            recordContainer.setAlpha(busy ? 0.5f : 1.0f);
         }
 
         if (hintView != null && !applyPendingHint() && !isRecording) {
@@ -638,9 +904,11 @@ public class RustInputMethodService extends InputMethodService {
     public void onTextTranscribed(String text) {
         mainHandler.post(() -> {
             isTranscribing = false;
+            lastStatus = "Ready";
             if (text == null || text.trim().isEmpty()) {
                 // Nothing recognized — don't insert a stray space.
                 updateRecordButtonUI(false);
+                updateUiState();
                 if (statusView != null) statusView.setText(R.string.voice_no_speech);
                 releaseAudioFocus();
                 if (quickSwitchBar != null) quickSwitchBar.flushPending();
@@ -650,6 +918,12 @@ public class RustInputMethodService extends InputMethodService {
                 }
                 return;
             }
+            try {
+                history.add(text.trim(), System.currentTimeMillis());
+            } catch (IOException e) {
+                Log.w(TAG, "Could not save transcript history", e);
+            }
+            if (historyOpen) refreshHistoryPanel();
             String committed = text + " ";
             InputConnection ic = getCurrentInputConnection();
             if (inputActive && ic != null) {
@@ -663,6 +937,7 @@ public class RustInputMethodService extends InputMethodService {
             }
             releaseAudioFocus();
             updateRecordButtonUI(false);
+            updateUiState();
             if (statusView != null) statusView.setText(R.string.ime_tap_to_record);
             if (quickSwitchBar != null) quickSwitchBar.flushPending();
             if (pendingSwitchBack) {

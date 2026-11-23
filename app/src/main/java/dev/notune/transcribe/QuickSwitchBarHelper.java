@@ -18,10 +18,16 @@ import java.util.List;
 /**
  * Drives the quick model / language chip bar ({@code quick_switch_bar.xml}) on
  * the voice keyboard and the voice popup. One tap on a chip selects a model or
- * a language; while a recording or its transcription is running (the host's
- * {@link Host#shouldDeferSwitch()}), the tap is only queued in the host-owned
- * {@link PendingSwitchState} and applied by {@link #flushPending()} once the
- * utterance is done, so dictation is never interrupted.
+ * a language. While a recording or its transcription is running (the host's
+ * {@link Host#shouldDeferSwitch()}):
+ * <ul>
+ * <li>a tap discards the recording ({@link Host#discardRecordingForSwitch()})
+ *     and switches right away, so a wrong-language take never has to be
+ *     transcribed first;</li>
+ * <li>a long press (or a tap while only transcribing, which can't be aborted)
+ *     queues the switch in the host-owned {@link PendingSwitchState}, and
+ *     {@link #flushPending()} applies it once the utterance is done.</li>
+ * </ul>
  *
  * All views and colors come from the bar's own themed context (the IME and the
  * activity wrap their context in the Material 3 / dynamic-color theme; the
@@ -34,8 +40,24 @@ public final class QuickSwitchBarHelper {
         /** True while recording or transcribing: taps are queued, not applied. */
         boolean shouldDeferSwitch();
 
+        /**
+         * A chip was tapped while recording: drop the audio without
+         * transcribing it. Returns true if the recording was discarded and the
+         * switch can be applied now, false if it must be queued (e.g. the audio
+         * is already being transcribed).
+         */
+        boolean discardRecordingForSwitch();
+
         /** The selection on disk changed (or a queued switch was resolved); reload the engine if needed. */
         void onSelectionApplied(boolean modelChanged, boolean langChanged);
+
+        /**
+         * A chip tap changed the model or language right away (not a switch
+         * queued by a long press and applied after the transcription). Called
+         * after {@link #onSelectionApplied}; the keyboard uses it to start
+         * listening in the new language.
+         */
+        void onSwitchTapped();
 
         /** The queued switch changed; update any "Next: …" hint. */
         void onPendingChanged();
@@ -64,8 +86,10 @@ public final class QuickSwitchBarHelper {
 
         barView.findViewById(R.id.btn_manage_models)
                 .setOnClickListener(v -> host.onManageModelsClicked());
-        chipBg.setOnClickListener(v -> onLanguageTapped(ModelStore.LANG_BG));
-        chipEn.setOnClickListener(v -> onLanguageTapped(ModelStore.LANG_EN));
+        chipBg.setOnClickListener(v -> onLanguageTapped(ModelStore.LANG_BG, false));
+        chipEn.setOnClickListener(v -> onLanguageTapped(ModelStore.LANG_EN, false));
+        chipBg.setOnLongClickListener(v -> onLanguageTapped(ModelStore.LANG_BG, true));
+        chipEn.setOnLongClickListener(v -> onLanguageTapped(ModelStore.LANG_EN, true));
         refresh();
     }
 
@@ -127,7 +151,8 @@ public final class QuickSwitchBarHelper {
                     : (key.equals(activeModel) ? ChipState.ACTIVE : ChipState.INACTIVE);
             TextView chip = newChip(label);
             styleChip(chip, label, state);
-            chip.setOnClickListener(v -> onModelTapped(key));
+            chip.setOnClickListener(v -> onModelTapped(key, false));
+            chip.setOnLongClickListener(v -> onModelTapped(key, true));
             modelChips.addView(chip);
         }
 
@@ -198,15 +223,19 @@ public final class QuickSwitchBarHelper {
 
     // --- Taps ---------------------------------------------------------------
 
-    private void onModelTapped(String key) {
+    /**
+     * {@code keepRecording}: long press. During a session it queues the switch
+     * (the recording is transcribed first); otherwise it acts like a tap.
+     * Always returns true so a long press is consumed.
+     */
+    private boolean onModelTapped(String key, boolean keepRecording) {
         String activeModel = ModelStore.activeModel(themedContext);
         String activeLang = ModelStore.activeLanguage(themedContext);
         if (host.shouldDeferSwitch()) {
             pendingState.queueModel(key, activeModel, activeLang,
                     ModelStore.lastExplicitLanguage(themedContext));
-            refresh();
-            host.onPendingChanged();
-            return;
+            afterQueued(keepRecording);
+            return true;
         }
         pendingState.clear();
         boolean modelChanged = !key.equals(activeModel);
@@ -215,24 +244,51 @@ public final class QuickSwitchBarHelper {
         boolean langChanged = !langAfter.equals(activeLang);
         refresh();
         host.onPendingChanged();
-        if (modelChanged || langChanged) host.onSelectionApplied(modelChanged, langChanged);
+        if (modelChanged || langChanged) {
+            host.onSelectionApplied(modelChanged, langChanged);
+            host.onSwitchTapped();
+        }
+        return true;
     }
 
-    private void onLanguageTapped(String tag) {
+    /** See {@link #onModelTapped(String, boolean)}. */
+    private boolean onLanguageTapped(String tag, boolean keepRecording) {
         String activeModel = ModelStore.activeModel(themedContext);
         String activeLang = ModelStore.activeLanguage(themedContext);
         if (host.shouldDeferSwitch()) {
             pendingState.queueLanguage(tag, activeModel, activeLang);
-            refresh();
-            host.onPendingChanged();
-            return;
+            afterQueued(keepRecording);
+            return true;
         }
         pendingState.clear();
         boolean langChanged = !tag.equals(activeLang);
         if (langChanged) ModelStore.setActiveLanguage(themedContext, tag);
         refresh();
         host.onPendingChanged();
-        if (langChanged) host.onSelectionApplied(false, true);
+        if (langChanged) {
+            host.onSelectionApplied(false, true);
+            host.onSwitchTapped();
+        }
+        return true;
+    }
+
+    /**
+     * A chip changed the queued switch during a session. On a plain tap that
+     * leaves a real switch queued, discard the recording and apply it now
+     * (merged with anything queued earlier). Tapping the chip already in
+     * effect only cancels the queue and never throws away the dictation.
+     */
+    private void afterQueued(boolean keepRecording) {
+        if (!keepRecording && pendingState.hasPending() && host.discardRecordingForSwitch()) {
+            // The host may already have flushed the queue while ending the
+            // session; then this is a no-op.
+            if (!flushPending()) refresh();
+            host.onPendingChanged();
+            host.onSwitchTapped();
+            return;
+        }
+        refresh();
+        host.onPendingChanged();
     }
 
     /**

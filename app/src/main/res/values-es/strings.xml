@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">No hay ningún modelo de voz instalado</string>
     <string name="no_model_main">La entrada de voz, los subtítulos en directo y la transcripción de archivos necesitan un modelo de voz. Toca «Añadir un modelo de voz» para descargar uno en tu navegador e importarlo.</string>
-    <string name="no_model_steps">1. Toca «Descargar el modelo recomendado». Tu navegador descarga Parakeet TDT 0.6B v3 (485 MB, 25 idiomas europeos).\n2. Cuando termine la descarga, toca «Importar archivo de modelo» abajo y elige el archivo .gguf descargado (normalmente en Descargas).\n\nLa app en sí permanece sin conexión; solo tu navegador descarga el archivo. Puedes borrarlo de Descargas después de importarlo.</string>
-    <string name="btn_download_recommended">Descargar el modelo recomendado (485 MB)</string>
+    <string name="no_model_steps">1. Toca «Descargar el modelo recomendado». Tu navegador descarga Canary 1B v2 (1,1 GB, 25 idiomas europeos).\n2. Cuando termine la descarga, toca «Importar archivo de modelo» abajo y elige el archivo .gguf descargado (normalmente en Descargas).\n\nLa app en sí permanece sin conexión; solo tu navegador descarga el archivo. Puedes borrarlo de Descargas después de importarlo.</string>
+    <string name="btn_download_recommended">Descargar el modelo recomendado (1,1 GB)</string>
     <string name="btn_add_model">Añadir un modelo de voz</string>
     <string name="models_desc_no_builtin">Importa cualquier modelo GGUF de transcribe.cpp que hayas descargado. La app permanece totalmente sin conexión; las descargas se hacen en tu navegador.</string>
     <string name="model_desc_recommended">Recomendado · 25 idiomas europeos, rápido y preciso</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Se necesita permiso de micrófono.\nConcédelo en la app.</string>
     <string name="ime_tap_to_record">Toca para grabar</string>
     <string name="ime_tap_to_stop">Toca para detener</string>
+    <string name="ime_recording_discarded">Grabación descartada</string>
     <string name="ime_listening">Escuchando…</string>
     <string name="ime_need_mic">Sin permiso de micrófono</string>
     <string name="ime_need_mic_hint">Abre la app para concederlo</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Permite «Mostrar sobre otras apps»</string>
     <string name="subs_overlay_required">Los subtítulos en directo necesitan el permiso «Mostrar sobre otras apps»</string>
     <string name="subs_capture_denied">Se denegó la captura de pantalla</string>
+
+    <string name="history_button_desc">Historial de transcripciones</string>
+    <string name="history_retry">Reintentar la última grabación</string>
+    <string name="history_clear">Borrar</string>
+    <string name="history_clear_confirm">Toca otra vez para borrar</string>
+    <string name="history_close_desc">Cerrar el historial</string>
+    <string name="history_empty">Aún no hay transcripciones</string>
+    <string name="history_no_field">Toca primero un campo de texto</string>
 </resources>

@@ -82,8 +82,8 @@
     <!-- No model available (F-Droid builds start without one) -->
     <string name="no_model_title">Nessun modello vocale installato</string>
     <string name="no_model_main">L\'immissione vocale, i sottotitoli in tempo reale e la trascrizione di file richiedono un modello vocale. Tocca «Aggiungi un modello vocale» per scaricarne uno nel browser e importarlo.</string>
-    <string name="no_model_steps">1. Tocca «Scarica il modello consigliato». Il browser scarica Parakeet TDT 0.6B v3 (485 MB, 25 lingue europee).\n2. Al termine del download, tocca «Importa file del modello» qui sotto e scegli il file .gguf scaricato (di solito in Download).\n\nL\'app in sé resta offline; solo il browser scarica il file. Dopo l\'importazione puoi eliminarlo dai Download.</string>
-    <string name="btn_download_recommended">Scarica il modello consigliato (485 MB)</string>
+    <string name="no_model_steps">1. Tocca «Scarica il modello consigliato». Il browser scarica Canary 1B v2 (1,1 GB, 25 lingue europee).\n2. Al termine del download, tocca «Importa file del modello» qui sotto e scegli il file .gguf scaricato (di solito in Download).\n\nL\'app in sé resta offline; solo il browser scarica il file. Dopo l\'importazione puoi eliminarlo dai Download.</string>
+    <string name="btn_download_recommended">Scarica il modello consigliato (1,1 GB)</string>
     <string name="btn_add_model">Aggiungi un modello vocale</string>
     <string name="models_desc_no_builtin">Importa qualsiasi modello GGUF di transcribe.cpp che hai scaricato. L\'app resta completamente offline; i download avvengono nel browser.</string>
     <string name="model_desc_recommended">Consigliato · 25 lingue europee, veloce e preciso</string>
@@ -126,6 +126,7 @@
     <string name="voice_need_mic">Serve il permesso del microfono.\nConcedilo nell\'app.</string>
     <string name="ime_tap_to_record">Tocca per registrare</string>
     <string name="ime_tap_to_stop">Tocca per fermare</string>
+    <string name="ime_recording_discarded">Registrazione scartata</string>
     <string name="ime_listening">In ascolto…</string>
     <string name="ime_need_mic">Nessun permesso del microfono</string>
     <string name="ime_need_mic_hint">Apri l\'app per concederlo</string>
@@ -152,4 +153,12 @@
     <string name="subs_grant_overlay">Consenti «Mostra sopra altre app»</string>
     <string name="subs_overlay_required">I sottotitoli in tempo reale richiedono il permesso «Mostra sopra altre app»</string>
     <string name="subs_capture_denied">La cattura dello schermo è stata negata</string>
+
+    <string name="history_button_desc">Cronologia delle trascrizioni</string>
+    <string name="history_retry">Riprova l’ultima registrazione</string>
+    <string name="history_clear">Cancella</string>
+    <string name="history_clear_confirm">Tocca ancora per cancellare</string>
+    <string name="history_close_desc">Chiudi la cronologia</string>
+    <string name="history_empty">Nessuna trascrizione</string>
+    <string name="history_no_field">Tocca prima un campo di testo</string>
 </resources>

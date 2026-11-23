@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Which speech models the app can use: the bundled Parakeet model (absent in
+ * Which speech models the app can use: the bundled Canary model (absent in
  * F-Droid builds) and GGUF files imported into {@code files/models/}. The
  * selection is the {@code active_model} marker file read by the Rust engine
  * loader: the file name of an imported model, absent/empty = bundled model.
@@ -34,11 +34,14 @@ public final class ModelStore {
     /** Engine status when there is nothing to load (NO_MODEL_STATUS in src/engine.rs). */
     public static final String NO_MODEL_STATUS = "Error: no speech model installed";
 
+    /** File name of the bundled model (modelPackFiles in app/build.gradle.kts). */
+    static final String BUILTIN_MODEL_FILE = "canary-1b-v2-Q8_0.gguf";
+
     /** The bundled model, offered as the first download when it isn't bundled. */
-    public static final String RECOMMENDED_NAME = "Parakeet TDT 0.6B v3";
-    public static final String RECOMMENDED_SIZE = "485 MB";
+    public static final String RECOMMENDED_NAME = "Canary 1B v2 Q8";
+    public static final String RECOMMENDED_SIZE = "1.1 GB";
     public static final String RECOMMENDED_URL =
-            "https://huggingface.co/handy-computer/parakeet-tdt-0.6b-v3-gguf/resolve/main/parakeet-tdt-0.6b-v3-Q4_K_M.gguf";
+            "https://huggingface.co/handy-computer/canary-1b-v2-gguf/resolve/main/" + BUILTIN_MODEL_FILE;
 
     private static Boolean builtin;
 
@@ -172,6 +175,14 @@ public final class ModelStore {
     }
 
     /**
+     * True if the model with this key ("" = bundled) needs an explicit
+     * language, i.e. is a Canary model.
+     */
+    public static boolean needsExplicitLanguage(String modelKey) {
+        return isCanaryModel(modelKey == null || modelKey.isEmpty() ? BUILTIN_MODEL_FILE : modelKey);
+    }
+
+    /**
      * Canary has no automatic mode: if it is the model and the language is
      * empty/auto, applies the last explicit language. Returns the language in
      * effect afterwards.
@@ -182,7 +193,7 @@ public final class ModelStore {
 
     static String ensureValidLanguageInDir(File filesDir, String modelFileName) {
         String lang = activeLanguageInDir(filesDir);
-        if (isCanaryModel(modelFileName) && (lang.isEmpty() || lang.equalsIgnoreCase("auto"))) {
+        if (needsExplicitLanguage(modelFileName) && (lang.isEmpty() || lang.equalsIgnoreCase("auto"))) {
             lang = lastExplicitLanguageInDir(filesDir);
             setActiveLanguageInDir(filesDir, lang);
         }
@@ -296,18 +307,14 @@ public final class ModelStore {
     }
 
     /**
-     * Statuses ending a transcription without a result. A fallback notice such
-     * as "Error loading X: ... - using built-in model" is not one: the session
-     * goes on with the bundled model.
+     * Any error ends the attempt so the keyboard cannot stay busy. The
+     * built-in-model fallback notice continues the current attempt.
      */
     static boolean isTranscriptionFailureStatus(String status) {
         return status != null && (
                 status.equals("Canceled")
                 || status.equals(NO_MODEL_STATUS)
-                || status.startsWith("Error: no audio recorded")
-                || status.startsWith("Error: model not loaded")
-                || status.startsWith("Error: Model failed to load")
-                || (status.startsWith("Error loading ") && !status.contains("using built-in model")));
+                || (status.startsWith("Error") && !status.contains("using built-in model")));
     }
 
     /** An engine status for display, with the no-model error translated. */

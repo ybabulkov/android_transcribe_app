@@ -10,11 +10,12 @@ TRANSCRIBE AUDIO FILES
 Share an audio file to Offline Voice Input (or open it with the app) to turn the recording into text.
 
 SPEECH MODELS
-F-Droid builds everything from source, so this version comes without a speech model. On first start, the app walks you through adding one in two steps: your browser downloads the recommended model (NVIDIA Parakeet TDT 0.6B v3, 485 MB, 25 European languages), then you import the file. You can also import any other transcribe.cpp GGUF model, for example Whisper for 99 languages or a small English-only Parakeet. The app itself never goes online.
+F-Droid builds everything from source, so this version comes without a speech model. On first start, the app walks you through adding one in two steps: your browser downloads the recommended model (NVIDIA Canary 1B v2, 1.1 GB, 25 European languages), then you import the file. You can also import any other transcribe.cpp GGUF model, for example Whisper for 99 languages or a small English-only Parakeet. The app itself never goes online.
 
 FEATURES
 • 100% offline: works in airplane mode, nothing is ever uploaded
-• Private by design: audio is processed on-device and never stored or sent
+• Private by design: audio is processed on-device, and the last keyboard recording stays in private app storage
+• Keyboard transcript history: tap to reinsert any of the last five transcripts or retry the last recording
 • Optional auto-stop after silence and pausing of playing media while you speak
 • Translation to English with Whisper models
 • Material You design with dark mode

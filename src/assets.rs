@@ -97,17 +97,16 @@ fn list_builtin_assets(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<Ve
 pub fn extract_builtin_model(env: &mut JNIEnv, context: &JObject) -> anyhow::Result<PathBuf> {
     let base_path = files_dir(env, context)?;
     let model_dir = base_path.join(BUILTIN_MODEL_DIR);
-    let marker_file = model_dir.join(EXTRACTION_COMPLETE_MARKER);
 
     // The marker only ever appears together with a complete directory.
-    if marker_file.exists() {
-        return find_gguf(&model_dir);
+    if let Some(path) = current_extraction(env, context, &model_dir) {
+        return Ok(path);
     }
 
     let _lock = ExtractionLock::acquire(&base_path.join(EXTRACTION_LOCK))?;
     // Another process may have finished extracting while we waited.
-    if marker_file.exists() {
-        return find_gguf(&model_dir);
+    if let Some(path) = current_extraction(env, context, &model_dir) {
+        return Ok(path);
     }
 
     let legacy_dir = base_path.join(LEGACY_MODEL_DIR);
@@ -139,6 +138,30 @@ pub fn extract_builtin_model(env: &mut JNIEnv, context: &JObject) -> anyhow::Res
     log::info!("Asset extraction complete");
 
     find_gguf(&model_dir)
+}
+
+/// The extracted GGUF if the extraction is complete and still matches the
+/// APK: after an update that bundles a different model (e.g. Parakeet ->
+/// Canary), the old extraction is stale and gets replaced.
+fn current_extraction(env: &mut JNIEnv, context: &JObject, model_dir: &Path) -> Option<PathBuf> {
+    if !model_dir.join(EXTRACTION_COMPLETE_MARKER).exists() {
+        return None;
+    }
+    let path = find_gguf(model_dir).ok()?;
+    let name = path.file_name()?.to_str()?.to_string();
+    match list_builtin_assets(env, context) {
+        Ok(assets) if assets.iter().any(|a| *a == name) => Some(path),
+        Ok(_) => {
+            log::info!("Bundled model changed; replacing extracted {}", name);
+            None
+        }
+        Err(e) => {
+            // Can't tell: keep using what is there rather than failing.
+            let _ = env.exception_clear();
+            log::warn!("cannot list bundled model assets: {}", e);
+            Some(path)
+        }
+    }
 }
 
 /// Copies the bundled model into `tmp_root` and marks it complete; returns
