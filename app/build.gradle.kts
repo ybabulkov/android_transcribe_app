@@ -18,8 +18,8 @@ android {
         applicationId = "dev.notune.transcribe.mod"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "0.2.3"
+        versionCode = 24
+        versionName = "0.2.3-mod.1"
         ndk {
             abiFilters += targetAbis
         }

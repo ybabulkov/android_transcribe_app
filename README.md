@@ -1,182 +1,221 @@
-# Offline Voice Input (Android)
+<div align="center">
 
-An offline, privacy-focused speech-to-text tool for Android, built with Rust. Tap the microphone on the keyboard you already use — your speech is transcribed entirely on-device and typed into any app. Also includes live subtitles and an optional dedicated voice keyboard.
+# Offline Voice Input — Mod
 
-[<img src="https://i.ibb.co/q0mdc4Z/get-it-on-github.png"
-alt="Get it on GitHub"
-height="80">](https://github.com/notune/android_transcribe_app/releases/latest)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-alt="Get it on Google Play"
-height="80">](https://play.google.com/store/apps/details?id=dev.notune.transcribe)
-[<img src=".github/badges/get-it-on-obtainium.png"
-alt="Get it on Obtainium"
-height="80">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.notune.transcribe%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fnotune%2Fandroid_transcribe_app%22%2C%22author%22%3A%22notune%22%2C%22name%22%3A%22Offline%20Voice%20Input%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22fdroid%5C%22%2C%5C%22invertAPKFilter%5C%22%3Atrue%7D%22%7D)
+**Private, on-device speech-to-text for Android, with one-tap model & language switching, transcript history and a keyboard that never gets stuck.**
 
-## Features
+A community fork of [notune/android_transcribe_app](https://github.com/notune/android_transcribe_app).
+Everything runs on your phone. No account, no cloud, no internet permission.
 
-- **Voice input in any app:** Tap the microphone on the keyboard you already use (SwiftKey, etc.) or a website's voice search, and your speech is transcribed straight into the text field. The app registers as your device's speech-to-text provider.
-- **100% offline & private:** The Canary 1B v2 model runs entirely on-device — no audio ever leaves your phone, and no network is required.
-- **Live Subtitles:** Real-time captions for any audio/video playing on your device.
-- **Optional voice keyboard:** A built-in keyboard you can switch to for voice input wherever you prefer it.
-- **Keyboard transcript history:** Tap to reinsert any of the last five transcripts or retry the last recording.
-- **Supported Languages:** Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Spanish, Swedish, Russian, Ukrainian.
-- **Custom models:** Import any [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) GGUF model (Whisper, Nemotron streaming, Parakeet, other Canary quantizations, …) from a downloaded file — the app stays fully offline; downloads happen in your browser.
-- **Efficient native backend:** All models run through [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) (ggml), wrapped in a safe Rust core.
+[![Latest release](https://img.shields.io/github/v/release/ybabulkov/android_transcribe_app?label=download&style=for-the-badge&color=4c6ef5)](https://github.com/ybabulkov/android_transcribe_app/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2f9e44?style=for-the-badge)](LICENSE)
+[![Upstream](https://img.shields.io/badge/based%20on-notune%2Fandroid__transcribe__app-555?style=for-the-badge)](https://github.com/notune/android_transcribe_app)
 
-## Screenshots
+[<img src=".github/badges/get-it-on-obtainium.png" alt="Get it on Obtainium" height="64">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.notune.transcribe.mod%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fybabulkov%2Fandroid_transcribe_app%22%2C%22author%22%3A%22ybabulkov%22%2C%22name%22%3A%22Offline%20Voice%20Input%20(Mod)%22%2C%22additionalSettings%22%3A%22%7B%5C%22apkFilterRegEx%5C%22%3A%5C%22no_model%5C%22%2C%5C%22invertAPKFilter%5C%22%3Atrue%7D%22%7D)
 
-<p float="left">
+<table>
+  <tr>
+    <td align="center"><img src=".screenshots/mod_chips.png" width="240" alt="Voice keyboard with model and language chips"><br><sub><b>One-tap model & language chips</b></sub></td>
+    <td align="center"><img src=".screenshots/mod_history.png" width="240" alt="Transcript history panel with Retry last recording"><br><sub><b>Transcript history & retry</b></sub></td>
+    <td align="center"><img src=".screenshots/mod_switch_insert.png" width="240" alt="History entry inserted and language switched to English"><br><sub><b>Tap to reinsert · switched to EN</b></sub></td>
+  </tr>
+</table>
+
+<details>
+<summary>More screenshots (home, popup, live subtitles)</summary>
+<p>
   <img src=".screenshots/screenshot_home.png" width="30%" />
   <img src=".screenshots/screenshot_recording.png" width="30%" />
   <img src=".screenshots/screenshot_subtitles.png" width="30%" />
 </p>
+</details>
 
-## Usage
+</div>
 
-### Voice input in any app (recommended)
+---
 
-1. Open **Offline Voice Input** once and grant the microphone permission. The home screen shows a **Voice input** status — green when you're ready to go.
-2. In any app, tap the **microphone** on your keyboard (e.g. Microsoft SwiftKey) or the voice-search mic on a website. A compact panel slides up over the app you're in, you speak, and your words are inserted as text. Tap to stop — or enable *Auto-stop after silence* in the app's settings to have it stop by itself.
+## ✨ What this fork adds
 
-The app plugs into Android's speech-to-text in **three** ways, so it works with a wide range of keyboards and apps:
+> [!TIP]
+> The mod installs **next to** the official app (its own package, `dev.notune.transcribe.mod`, shown as *Offline Voice Input (Mod)*). You can try it without uninstalling anything.
+
+### 1. One-tap model & language chips
+
+Switch speech model or language right on the voice keyboard and the voice popup. You don't have to open settings or leave the app you're typing in.
+
+- **Model chips** for every installed model, plus a ⚙ button to manage or import more.
+- **BG / EN chips** for Bulgarian and English.
+- **Language switches are instant.** Only the language changes inside the loaded model (in-place language update), so the ~1 GB model doesn't reload from storage.
+- **Safe while you're talking:**
+
+  | While recording… | What happens |
+  |---|---|
+  | **Tap** a chip | The recording is discarded and the switch happens right away |
+  | **Long-press** a chip | What you said is transcribed first, then the switch is applied (the chip shows ⏱ and the hint says *Next: …*) |
+  | *Auto-record* is on | After a tap-switch the keyboard starts listening again straight away |
+
+  The keyboard-switch key works the same way: tap to leave now, long-press to transcribe first and then leave.
+- **Canary needs a language.** Canary models can't auto-detect a language. If one is selected with the language set to *auto*, the mod applies your last explicit choice (Bulgarian by default).
+
+### 2. Transcript history & retry
+
+Your words don't get lost anymore.
+
+- A 🕘 **history button** on the voice keyboard shows your **last 5 transcripts**. Tap one to insert it at the cursor.
+- Each transcript is saved **before** it's typed into the text field. If inserting fails (the app lost focus, the field changed), the text is still in the history.
+- **Retry last recording** runs the last recording through transcription again, using the model and language selected *now*. Useful when a model got your words wrong or a transcription failed.
+- **Clear** (tap twice) wipes the history and the saved recording.
+- Both stay in private app storage and are **excluded from cloud backup and device transfer**.
+
+### 3. No more "Processing…" forever
+
+Several bugs that could leave the keyboard stuck are fixed:
+
+- Any error now ends the transcription properly. Before, some errors left the keyboard "busy": mic taps were ignored and queued switches never applied.
+- A crash inside the transcription worker or during model loading now shows an error instead of hanging silently.
+- Escape hatch: tapping the mic while it says *Processing* with nothing actually running resets the keyboard.
+- *Transcribe, then switch keyboard* (long-press) waits for the text. It no longer leaves early when the "using built-in model" notice appears.
+
+### 4. Canary 1B v2 as the built-in model
+
+The bundled model is **NVIDIA Canary 1B v2 (Q8)** instead of Parakeet TDT 0.6B. It's bigger (~1.1 GB vs ~485 MB) and covers the same 25 European languages. You pick the language explicitly with the chips. Prefer a smaller download? Grab the `_no_model` APK and import any model you like.
+
+### Upstream vs. this mod
+
+| | Upstream | **Mod** |
+|---|:---:|:---:|
+| Offline voice input, voice keyboard, live subtitles | ✅ | ✅ |
+| Switch model / language from the keyboard | — | ✅ one tap |
+| Change language without reloading the model | — | ✅ |
+| Transcript history (last 5) | — | ✅ |
+| Retry the last recording | — | ✅ |
+| Stuck-on-Processing fixes | — | ✅ |
+| Built-in model | Parakeet TDT 0.6B v3 | Canary 1B v2 |
+| Installs alongside the official app | — | ✅ |
+| Google Play / F-Droid | ✅ | — (GitHub & Obtainium only) |
+
+---
+
+## 📥 Install
+
+1. Download from the [latest release](https://github.com/ybabulkov/android_transcribe_app/releases/latest):
+   - `offline_voice_input_mod_vX.apk`: includes Canary 1B v2 and works out of the box (~1.1 GB).
+   - `offline_voice_input_mod_vX_no_model.apk`: small download; on first start it shows you how to import a model.
+2. Or add it to **[Obtainium](https://github.com/ImranR98/Obtainium)** with the badge above to get updates automatically.
+
+> [!NOTE]
+> Releases are signed with this fork's own key, so they can't update the official app (and the official app can't update them). That's intended: they're separate apps.
+
+---
+
+## 🎙️ Usage
+
+### Voice input in any app
+
+1. Open **Offline Voice Input (Mod)** once and grant the microphone permission. The home screen shows a **Voice input** status. It's green when you're ready.
+2. In any app, tap the **microphone** on your keyboard (e.g. Microsoft SwiftKey) or the voice-search mic on a website. A compact panel slides up over the app, you speak, and your words are inserted as text. Tap to stop, or enable *Auto-stop after silence* in settings.
+
+The app plugs into Android's speech-to-text in **three** ways:
 
 | Path | Who uses it | What happens |
 |---|---|---|
-| **Voice-input popup** (`RECOGNIZE_SPEECH`) | SwiftKey, website voice search, many apps | The compact bottom panel opens over the current app |
+| **Voice-input popup** (`RECOGNIZE_SPEECH`) | SwiftKey, website voice search, many apps | The compact bottom panel opens over the current app, with the model/language chips |
 | **System speech service** (`RecognitionService`) | Keyboards/apps using Android's `SpeechRecognizer` | Recognition runs invisibly in the background with automatic endpointing |
-| **Voice keyboard (IME)** | Any keyboard, via the keyboard switcher — also HeliBoard/AnySoftKeyboard-style "switch to voice IME" mic keys | The dedicated voice keyboard opens |
+| **Voice keyboard (IME)** | Any keyboard, via the keyboard switcher, plus HeliBoard/AnySoftKeyboard-style "switch to voice IME" mic keys | The dedicated voice keyboard opens, with chips and history |
 
-Tap **Try voice input** on the home screen to test the whole flow in one tap.
+Tap **Try voice input** on the home screen to test the whole flow.
 
-**Keyboard notes** (mic-key behavior verified against each keyboard's source and tested in the emulator):
+<details>
+<summary><b>Keyboard compatibility notes</b></summary>
 
-- **Microsoft SwiftKey** (not open source) opens the compact voice panel directly, like website voice search does. If SwiftKey's own voice typing opens instead, go to SwiftKey Settings → *Rich input* → turn off **Multi-modal voice typing**.
-- **AnySoftKeyboard** is the open-source way to get the panel: its mic key fires the standard speech intent as long as no *voice keyboard* is enabled on the system. (If one is enabled — ours or Google's — it switches to that instead.)
-- **HeliBoard, FlorisBoard, OpenBoard, Fossify Keyboard, Unexpected Keyboard:** their mic key never opens the panel — it switches to the system *voice input keyboard*. Enable the **Offline Voice Input** keyboard (see below) and it opens automatically; its keyboard-switch key takes you back. **FUTO Keyboard** ships its own built-in voice input.
-- **Gboard:** only uses Google's own voice typing, so it can't hand speech to this app at all.
-- If Android shows a chooser, pick **Offline Voice Input** and tap **Always**. If another app always opens, clear its default in *Settings → Apps*.
+- **Microsoft SwiftKey** opens the compact voice panel directly. If SwiftKey's own voice typing opens instead, go to SwiftKey Settings → *Rich input* → turn off **Multi-modal voice typing**.
+- **AnySoftKeyboard**: its mic key fires the standard speech intent as long as no *voice keyboard* is enabled on the system.
+- **HeliBoard, FlorisBoard, OpenBoard, Fossify Keyboard, Unexpected Keyboard**: their mic key switches to the system *voice input keyboard*. Enable the **Offline Voice Input (Mod)** keyboard and it opens automatically; its keyboard-switch key takes you back. **FUTO Keyboard** ships its own voice input, but works well alongside the mod's keyboard.
+- **Gboard** only uses Google's own voice typing, so it can't hand speech to this app.
+- If Android shows a chooser, pick **Offline Voice Input (Mod)** and tap **Always**.
 
-### Dedicated voice keyboard (optional)
+</details>
 
-Prefer voice input as its own keyboard? Enable the **Offline Voice Input** keyboard via *Open Keyboard Settings* on the home screen, switch to it from your keyboard switcher, then tap **Tap to Record**. By default the recording keeps running even if you switch apps or the keyboard closes (turn off *Record in background* in settings if you don't want that) — the text is inserted when you come back. While it's listening, tapping a model/language chip or the keyboard-switch key throws the recording away and switches immediately; long-press either one to have what you said transcribed first. With *auto-record* on, switching the language or model with a tap starts listening again right away.
+### Dedicated voice keyboard
+
+Enable the **Offline Voice Input (Mod)** keyboard via *Open Keyboard Settings* on the home screen, switch to it, then tap **Tap to Record**. By default the recording keeps running even if you switch apps or the keyboard closes (turn off *Record in background* if you don't want that). The text is inserted when you come back. The chip bar sits above the record button, and the 🕘 history button is at the right of the status row.
 
 ### Live subtitles
 
 Tap **Start Live Subtitles** and choose *Share entire screen* to get real-time, on-device captions for any audio or video playing on your device.
 
-**Advanced: skip the screen-capture dialog.** Android shows a "Start recording or casting?" consent dialog every time subtitles start. You can pre-approve it once via adb — after that, subtitles start instantly and the setting survives reboots (USB debugging can be turned off again afterwards):
+<details>
+<summary><b>Advanced: skip the screen-capture dialog</b></summary>
+
+Android asks "Start recording or casting?" every time subtitles start. You can pre-approve it once via adb (USB debugging can be turned off again afterwards):
 
 ```bash
-adb shell appops set --user 0 dev.notune.transcribe PROJECT_MEDIA allow
+adb shell appops set --user 0 dev.notune.transcribe.mod PROJECT_MEDIA allow
+# undo:
+adb shell appops set --user 0 dev.notune.transcribe.mod PROJECT_MEDIA default
 ```
 
-To undo it:
+This relies on the undocumented `PROJECT_MEDIA` app-op; on some OEM builds it may not work or may get reset.
 
-```bash
-adb shell appops set --user 0 dev.notune.transcribe PROJECT_MEDIA default
-```
-
-This relies on the undocumented `PROJECT_MEDIA` app-op; on some OEM builds it may not work or may get reset by the system — the normal dialog remains the fallback. The same instructions are shown in-app under *Skip the permission dialog (advanced)*.
+</details>
 
 ### Custom speech models
 
-The built-in Canary 1B v2 model works out of the box (it needs a language: Bulgarian by default, switchable to English or any other supported language). (The F-Droid build has no built-in model, since F-Droid builds everything from source: on first start, the app shows how to download the same model in your browser and import it. The F-Droid build is reproducible and carries the same signature as the GitHub releases, which also include it as `…_fdroid.apk`, so you can switch between the GitHub/Obtainium and F-Droid versions without reinstalling.) Under **Manage speech models** you can additionally import any [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) GGUF model: download a `.gguf` file in your browser (the in-app *Where to get models* dialog lists direct links, e.g. a tiny 135 MB English-only Parakeet, the multilingual Nemotron 3.5 streaming model with punctuation, or Whisper large-v3-turbo), then import it via the system file picker and select it. The app itself needs no internet permission — model files are simply copied into the app's private storage. An optional language hint (e.g. `en-US`, or `auto`) can be set for imported models.
+Under **Manage speech models** (or the ⚙ chip) you can import any [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) GGUF model: download a `.gguf` in your browser (the in-app *Where to get models* dialog lists direct links, e.g. a tiny 135 MB English-only Parakeet, the multilingual Nemotron 3.5 streaming model, or Whisper large-v3-turbo), then import it with the file picker. Every imported model gets its own chip on the keyboard. The app itself has no internet permission; model files are simply copied into its private storage.
 
-## Prerequisites
+**Supported languages (Canary / Parakeet):** Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Spanish, Swedish, Russian, Ukrainian. Whisper models add many more.
+
+---
+
+## 🔒 Privacy
+
+- No internet permission; audio never leaves the device.
+- The mod stores **one** extra audio file, your last keyboard recording (16 kHz mono WAV, about 1.9 MB per minute). It's replaced by each new recording so you can retry it. History and recording live in private app storage, are excluded from backups, and **Clear** deletes both.
+
+---
+
+## 🛠️ Building from source
 
 | Dependency | Installation |
 |---|---|
-| **JDK 17** | Android Studio (bundled) or `sudo pacman -S jdk17-openjdk` |
+| **JDK 17** | Android Studio (bundled) or your distro's `openjdk-17` |
 | **Android SDK** | Via Android Studio or `sdkmanager` |
 | **Android NDK** | `sdkmanager "ndk;28.0.13004108"` |
 | **Rust** | [rustup.rs](https://rustup.rs) + `rustup target add aarch64-linux-android` |
 | **cargo-ndk** | `cargo install cargo-ndk` |
 
-### Local Configuration
-
-Create a `local.properties` file in the project root (this file is gitignored):
-
-```properties
-sdk.dir=/path/to/your/Android/Sdk
-```
-
-Gradle uses `JAVA_HOME`. If your default Java is not JDK 17 (Gradle 8.9 can't run on JDK 22+), point Gradle at one in your user-level `~/.gradle/gradle.properties` instead of the project file:
-
-```properties
-org.gradle.java.home=/path/to/jdk17
-# Examples:
-#   /opt/android-studio/jbr          (Android Studio bundled JBR, if it is JDK 17/21)
-#   /usr/lib/jvm/java-17-openjdk     (System JDK 17)
-```
-
-## Building
-
-The app has two build flavors: `standard` (GitHub releases, Google Play) bundles the Canary 1B v2 model, `fdroid` is the same app without it.
-
-### Debug APK
-```bash
-./gradlew assembleStandardDebug
-# Output: app/build/outputs/apk/standard/debug/app-standard-debug.apk
-```
-
-### Release APK
-```bash
-./gradlew assembleStandardRelease
-# Output: app/build/outputs/apk/standard/release/app-standard-release.apk
-```
-
-### Release AAB (Google Play)
-```bash
-./gradlew bundleStandardRelease
-# Output: app/build/outputs/bundle/standardRelease/app-standard-release.aab
-```
-
-### F-Droid flavor (no bundled model)
-```bash
-./gradlew assembleFdroidRelease
-# Output: app/build/outputs/apk/fdroid/release/app-fdroid-release.apk
-```
-
-### Signing
-
-For release builds, place a `release.keystore` in the project root and set these environment variables:
+Create `local.properties` in the project root with `sdk.dir=/path/to/Android/Sdk`. If your default Java isn't JDK 17, set `org.gradle.java.home=/path/to/jdk17` in `~/.gradle/gradle.properties`.
 
 ```bash
-export KEY_ALIAS=release
-export KEY_PASS=yourpassword
-export STORE_PASS=yourpassword
+./gradlew assembleStandardDebug    # with Canary 1B v2 → app/build/outputs/apk/standard/debug/
+./gradlew assembleFdroidDebug      # no bundled model → app/build/outputs/apk/fdroid/debug/
+./gradlew testStandardDebugUnitTest  # JVM unit tests (model store, history)
 ```
 
-### Model Assets
+The Canary GGUF (~1.1 GB) is downloaded from Hugging Face on the first `standard` build and checked with SHA-256. For signed release builds, put a `release.keystore` in the project root and set `KEY_ALIAS`, `KEY_PASS` and `STORE_PASS`. Pushing a `v*` tag builds and publishes both APKs via GitHub Actions.
 
-The built-in Canary 1B v2 Q8 GGUF model (~1.1 GB) is automatically downloaded from HuggingFace during the first `standard` build via a Gradle task. The checksum is verified with SHA-256. No manual download is needed. `fdroid` builds never download it.
-
-## Project Structure
+<details>
+<summary><b>Project structure</b></summary>
 
 ```
-├── app/
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/dev/notune/transcribe/   # Android Java code
-│       ├── res/                          # Resources (layouts, drawables, etc.)
-│       ├── assets/                       # Model files (downloaded at build time)
-│       └── jniLibs/                      # Native .so files (built by cargo-ndk)
-├── src/                                  # Rust source code (cdylib)
-├── Cargo.toml                            # Rust crate manifest
-├── build.gradle.kts                      # Root Gradle config
-├── app/build.gradle.kts                  # App module config (AGP 8.13.2)
-├── settings.gradle.kts
-├── gradle.properties
-└── fastlane/metadata/android/            # F-Droid store listing
+├── app/src/main/
+│   ├── java/dev/notune/transcribe/   # Android (Java): keyboard, popup, chips, history
+│   └── res/                          # layouts, strings (en, de, es, fr, it, pt, ru)
+├── app/src/test/                     # JVM unit tests
+├── model_assets/                     # asset pack holding the bundled GGUF
+└── src/                              # Rust core (JNI): engine, sessions, last recording
 ```
 
-## Acknowledgments
+</details>
 
-- **Speech Model:** [Canary 1B v2](https://huggingface.co/nvidia/canary-1b-v2) by NVIDIA.
-    - GGUF conversion by [handy-computer](https://huggingface.co/handy-computer/canary-1b-v2-gguf).
-    - Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- **Inference Backend:** [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) by CJ Pais / Handy Computer.
+---
+
+## 🙏 Credits
+
+- **Original app:** [Offline Voice Input](https://github.com/notune/android_transcribe_app) by **Noah Mühl (notune)**. This mod wouldn't exist without it. If you want the official, Play Store / F-Droid version, use upstream.
+- **Speech model:** [Canary 1B v2](https://huggingface.co/nvidia/canary-1b-v2) by NVIDIA, licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). GGUF conversion by [handy-computer](https://huggingface.co/handy-computer/canary-1b-v2-gguf).
+- **Inference backend:** [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) by CJ Pais / Handy Computer.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE), same as upstream. Copyright notices of the original author are kept.
