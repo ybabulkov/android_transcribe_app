@@ -22,10 +22,10 @@ Everything runs on your phone. No account, no cloud, no internet permission.
 </table>
 
 <details>
-<summary>More screenshots (home, popup, live subtitles)</summary>
+<summary>More screenshots (home, voice popup with chips, live subtitles)</summary>
 <p>
   <img src=".screenshots/screenshot_home.png" width="30%" />
-  <img src=".screenshots/screenshot_recording.png" width="30%" />
+  <img src=".screenshots/mod_popup.png" width="30%" alt="Voice popup listening, with model and language chips" />
   <img src=".screenshots/screenshot_subtitles.png" width="30%" />
 </p>
 </details>
@@ -105,6 +105,14 @@ The bundled model is **NVIDIA Canary 1B v2 (Q8)** instead of Parakeet TDT 0.6B. 
 
 > [!NOTE]
 > Releases are signed with this fork's own key, so they can't update the official app (and the official app can't update them). That's intended: they're separate apps.
+
+**Verify your download.** Every release is signed with the same certificate. Its SHA-256 fingerprint:
+
+```
+30:62:FD:65:81:9C:64:D4:BD:4A:2E:BA:F5:28:8E:A8:30:9F:F1:DC:E1:7E:C6:31:1B:EE:6D:E6:2B:25:B3:C9
+```
+
+Check an APK with `apksigner verify --print-certs file.apk`, or paste the fingerprint into [AppVerifier](https://github.com/soupslurpr/AppVerifier). In Obtainium you can pin it so updates signed with any other key are refused.
 
 ---
 
